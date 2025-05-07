@@ -1,7 +1,7 @@
 import { Address, zeroAddress } from 'viem'
 import jwt from 'jsonwebtoken'
-import type { ITwitterAuth } from '@/hooks/use-sign-in'
 import { tryParse } from '@/utils/node'
+import type { ITwitterAuth } from '@/types/auth'
 
 enum EAuthType {
   Local,
