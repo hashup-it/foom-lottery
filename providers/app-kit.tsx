@@ -1,20 +1,22 @@
 import { createAppKit, Metadata } from '@reown/appkit/react'
 import { cookieToInitialState, WagmiProvider, Config } from 'wagmi'
 import { AppKitNetwork } from '@reown/appkit/networks'
-import { mainnet, base, sepolia, baseSepolia } from 'viem/chains'
+import { mainnet, base, sepolia, baseSepolia, foundry } from 'viem/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { cookieStorage, createStorage, http } from '@wagmi/core'
-import { WC_ID } from '@/utils/constants'
-import { _log } from '@/utils/ts'
-import { isDevelopment } from '@/utils/environment'
+import { WC_ID } from '@/lib/utils/constants'
+import { _log } from '@/lib/utils/ts'
+import { isDevelopment } from '@/lib/utils/environment'
 
 const queryClient = new QueryClient()
 
 const projectId = WC_ID
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = isDevelopment()
-  ? [sepolia, baseSepolia, mainnet, base]
-  : [mainnet, base]
+  ? // ? [sepolia, baseSepolia, mainnet, base]
+    // : [mainnet, base]
+    [foundry]
+  : [foundry]
 
 const metadata: Metadata = {
   name: 'FOOM',

@@ -4,9 +4,19 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
-import { _log, _warn } from '@/utils/ts'
+import { _log, _warn } from '@/lib/utils/ts'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { createPublicClient, createWalletClient, http, parseEther } from 'viem'
+import { foundry } from 'viem/chains'
+import { EthLotteryAbi } from '@/abis/eth-lottery'
+import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
+import { useAppKitWallet } from '@reown/appkit-wallet-button/react'
+import { usePublicClient, useWalletClient } from 'wagmi'
+import { waitForTransactionReceipt } from 'viem/actions'
+import { generateCommitment } from '@/lib/lottery/generateCommitment'
+import { useMutation } from '@tanstack/react-query'
+import SpinnerText from '@/components/shared/spinner-text'
 
 const generateValidBetAmounts = (betMin = 1, maxPower = 22) =>
   Array.from({ length: maxPower + 1 }, (_, i) => betMin * (2 + 2 ** i))
@@ -23,6 +33,52 @@ export default function Home() {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   })
+  const walletClient = useWalletClient().data
+  const publicClient = usePublicClient()
+
+  const play = async (amount: number, commitment: string, setStatus: React.Dispatch<React.SetStateAction<string>>) => {
+    if (!walletClient || !publicClient) {
+      throw new Error('Wallet not connected')
+    }
+
+    const { request } = await publicClient.simulateContract({
+      address: ETH_LOTTERY_ADDRESS,
+      abi: EthLotteryAbi,
+      functionName: 'play',
+      args: [commitment, 0],
+      value: parseEther(amount.toString()),
+      account: walletClient.account.address,
+    })
+
+    setStatus(prev => `${prev}\nSending transaction...`)
+    const txHash = await walletClient.writeContract(request)
+    setStatus(prev => `${prev}\nTransaction sent: ${txHash}`)
+    await waitForTransactionReceipt(walletClient, {
+      hash: txHash,
+    })
+
+    return txHash
+  }
+
+  const handleFormSubmit = form.handleSubmit(({ amount }) => {
+    playLotteryMutation.mutate(amount)
+  })
+
+  const playLotteryMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const commitment = await generateCommitment([`0x${Number(amount).toString(16)}`, 0])
+      setStatus(prev => `${prev}\nCommitment: ${JSON.stringify(commitment, null, 2)}`)
+
+      return await play(amount, commitment.ticket, setStatus)
+    },
+    onError: (error: any) => {
+      _log(error)
+      setStatus(prev => `${prev}\nError: ${error.message}`)
+    },
+    onSuccess: (txHash: string) => {
+      setStatus(prev => `${prev}\nTX hash: ${txHash}`)
+    },
+  })
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -33,7 +89,7 @@ export default function Home() {
         <div className="flex flex-col gap-2 justify-center mt-8 w-1/4">
           <form onSubmit={form.handleSubmit(data => console.log(data))}>
             <div>
-              <label className="text-xs text-tertiary italic">Amount of ETH deposited</label>
+              <label className="text-xs text-tertiary italic">Amount of ETH to deposit</label>
               {form.formState.errors.amount && (
                 <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
                   {form.formState.errors.amount.message}
@@ -52,14 +108,14 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2"
-            onClick={form.handleSubmit(data => console.log(data))}
+            onClick={handleFormSubmit}
           >
-            Continue
+            {playLotteryMutation.isPending ? <SpinnerText /> : 'Continue'}
           </Button>
         </div>
-        <div className="w-1/2 flex flex-col gap-1">
+        <div className="w-1/2 flex flex-col mb-2">
           <p>Status:</p>
-          <p className="whitespace-pre w-full">{status}</p>
+          <p className="w-full break-all whitespace-pre-wrap">{status}</p>
         </div>
       </div>
       <div className="flex-grow flex items-end justify-center">

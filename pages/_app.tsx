@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 
 import '@/styles/globals.css'
-import '@/utils/node'
+import '@/lib/utils/node'
 import { Providers } from '@/providers'
 
 interface IAppProps extends AppProps {

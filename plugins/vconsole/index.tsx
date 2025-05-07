@@ -1,5 +1,5 @@
-import { isDevelopment } from '@/utils/environment'
-import { _log } from '@/utils/ts'
+import { isDevelopment } from '@/lib/utils/environment'
+import { _log } from '@/lib/utils/ts'
 import VConsole from 'vconsole'
 
 function Vconsole() {
