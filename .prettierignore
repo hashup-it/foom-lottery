@@ -1,0 +1,9 @@
+.next
+pnpm-lock.yaml
+.history
+.vscode
+.prettierrc
+.prettierignore
+tailwind.config.ts
+next-env.d.ts
+README.md
