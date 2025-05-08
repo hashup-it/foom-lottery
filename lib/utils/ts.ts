@@ -20,6 +20,7 @@ const _logTable = (headers: string[], values: string[]): void => {
 }
 
 const _warn = (...msg: any) => console.warn(`\x1b[33m[Warn /!\\]:\x1b[0m`, ...msg)
+const _error = (...msg: any) => console.warn(`\x1b[31m[Error]:\x1b[0m`, ...msg)
 
 const parseIntegerSafe = (value: string | number): null | bigint => {
   let result: null | number = null
@@ -34,4 +35,4 @@ const parseIntegerSafe = (value: string | number): null | bigint => {
   return result === null ? null : BigInt(result)
 }
 
-export { _log, _warn, _newLine, parseIntegerSafe, _logTable }
+export { _log, _warn, _error, _newLine, parseIntegerSafe, _logTable }

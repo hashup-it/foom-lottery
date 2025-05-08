@@ -4,10 +4,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
-import { _log, _warn } from '@/lib/utils/ts'
+import { _error, _log, _warn } from '@/lib/utils/ts'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { createPublicClient, createWalletClient, http, parseEther } from 'viem'
+import { createPublicClient, createWalletClient, http, parseEther, type TransactionReceipt } from 'viem'
 import { foundry } from 'viem/chains'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
@@ -36,7 +36,9 @@ export default function Home() {
   const walletClient = useWalletClient().data
   const publicClient = usePublicClient()
 
-  const play = async (amount: number, commitment: string, setStatus: React.Dispatch<React.SetStateAction<string>>) => {
+  const handleStatus = (data: string) => setStatus(prev => `${prev}\n\n> ${data}`)
+
+  const play = async (amount: number, commitment: string) => {
     if (!walletClient || !publicClient) {
       throw new Error('Wallet not connected')
     }
@@ -50,33 +52,37 @@ export default function Home() {
       account: walletClient.account.address,
     })
 
-    setStatus(prev => `${prev}\nSending transaction...`)
+    handleStatus('Sending transaction...')
     const txHash = await walletClient.writeContract(request)
-    setStatus(prev => `${prev}\nTransaction sent: ${txHash}`)
-    await waitForTransactionReceipt(walletClient, {
+    handleStatus(`Transaction sent: ${txHash}`)
+    const receipt = await waitForTransactionReceipt(walletClient, {
       hash: txHash,
     })
 
-    return txHash
+    return receipt
   }
 
   const handleFormSubmit = form.handleSubmit(({ amount }) => {
     playLotteryMutation.mutate(amount)
   })
 
-  const playLotteryMutation = useMutation({
+  const playLotteryMutation = useMutation<TransactionReceipt, Error, number>({
     mutationFn: async (amount: number) => {
-      const commitment = await generateCommitment([`0x${Number(amount).toString(16)}`, 0])
-      setStatus(prev => `${prev}\nCommitment: ${JSON.stringify(commitment, null, 2)}`)
+      /** @dev TODO: Need to generate the commitment this many times until it validates correctly with the `0<_secrethash &&_secrethash < FIELD_SIZE` requirement. */
+      const commitment = await generateCommitment([
+        `0x${Number(amount).toString(16)}`,
+        0 /** @dev custom commitment input hash */,
+      ])
+      handleStatus(`Commitment: ${JSON.stringify(commitment, null, 2)}`)
 
-      return await play(amount, commitment.ticket, setStatus)
+      return await play(amount, commitment.ticket)
     },
     onError: (error: any) => {
-      _log(error)
-      setStatus(prev => `${prev}\nError: ${error.message}`)
+      _error(error)
+      handleStatus(`Error: ${error.message}`)
     },
-    onSuccess: (txHash: string) => {
-      setStatus(prev => `${prev}\nTX hash: ${txHash}`)
+    onSuccess: receipt => {
+      handleStatus(`TX hash: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
@@ -100,6 +106,7 @@ export default function Home() {
                   type="number"
                   placeholder="ETH amount"
                   {...form.register('amount', { valueAsNumber: true })}
+                  defaultValue={1026}
                 />
               </div>
             </div>
@@ -114,8 +121,7 @@ export default function Home() {
           </Button>
         </div>
         <div className="w-1/2 flex flex-col mb-2">
-          <p>Status:</p>
-          <p className="w-full break-all whitespace-pre-wrap">{status}</p>
+          <p className="w-full break-all whitespace-pre-wrap">Status:{status}</p>
         </div>
       </div>
       <div className="flex-grow flex items-end justify-center">
