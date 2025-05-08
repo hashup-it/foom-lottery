@@ -3,20 +3,19 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useMutation } from '@tanstack/react-query'
+import { createPublicClient, createWalletClient, http, parseEther, type Address, type TransactionReceipt } from 'viem'
+import { waitForTransactionReceipt } from 'viem/actions'
+import { usePublicClient, useWalletClient } from 'wagmi'
 
 import { _error, _log, _warn } from '@/lib/utils/ts'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { createPublicClient, createWalletClient, http, parseEther, type TransactionReceipt } from 'viem'
-import { foundry } from 'viem/chains'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
-import { useAppKitWallet } from '@reown/appkit-wallet-button/react'
-import { usePublicClient, useWalletClient } from 'wagmi'
-import { waitForTransactionReceipt } from 'viem/actions'
 import { generateCommitment } from '@/lib/lottery/generateCommitment'
-import { useMutation } from '@tanstack/react-query'
 import SpinnerText from '@/components/shared/spinner-text'
+import type { ICancelBetArgs, ICommitment } from '@/types/lottery'
 
 const generateValidBetAmounts = (betMin = 1, maxPower = 22) =>
   Array.from({ length: maxPower + 1 }, (_, i) => betMin * (2 + 2 ** i))
@@ -29,6 +28,7 @@ const schema = z.object({
 
 export default function Home() {
   const [status, setStatus] = React.useState('')
+  const [state, setState] = React.useState<ICommitment>()
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -75,7 +75,10 @@ export default function Home() {
       ])
       handleStatus(`Commitment: ${JSON.stringify(commitment, null, 2)}`)
 
-      return await play(amount, commitment.ticket)
+      const result = await play(amount, commitment.ticket)
+      setState(commitment)
+
+      return result
     },
     onError: (error: any) => {
       _error(error)
@@ -86,12 +89,36 @@ export default function Home() {
     },
   })
 
+  const cancelBetMutation = useMutation({
+    mutationFn: async ({ betIndex, mask, pA, pB, pC, recipient, relayer, fee = 0n, refund = 0n }: ICancelBetArgs) => {
+      if (!walletClient || !publicClient) {
+        throw new Error('Wallet not connected')
+      }
+
+      const { request } = await publicClient.simulateContract({
+        address: ETH_LOTTERY_ADDRESS,
+        abi: EthLotteryAbi,
+        functionName: 'cancelbet',
+        args: [betIndex, mask, pA, pB, pC, recipient, relayer, fee, refund],
+        value: refund,
+        account: walletClient.account.address,
+      })
+
+      const txHash = await walletClient.writeContract(request)
+      const txReceipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
+      setState(undefined)
+
+      return txReceipt
+    },
+  })
+
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex h-[1em]" />
       <div className="w-full flex items-center justify-start flex-col gap-2">
         <h1 className="text-2xl">FOOM Lottery</h1>
         <appkit-button />
+
         <div className="flex flex-col gap-2 justify-center mt-8 w-1/4">
           <form onSubmit={form.handleSubmit(data => console.log(data))}>
             <div>
@@ -106,24 +133,60 @@ export default function Home() {
                   type="number"
                   placeholder="ETH amount"
                   {...form.register('amount', { valueAsNumber: true })}
-                  defaultValue={1026}
+                  defaultValue={3}
                 />
               </div>
             </div>
           </form>
-
           <Button
             variant="outline"
             className="mt-2"
             onClick={handleFormSubmit}
           >
-            {playLotteryMutation.isPending ? <SpinnerText /> : 'Continue'}
+            {playLotteryMutation.isPending ? <SpinnerText /> : 'Play'}
+          </Button>
+          <Button
+            disabled={!state}
+            variant="outline"
+            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            onClick={() =>
+              cancelBetMutation.mutateAsync({
+                /** TODO: Dynamically find the betIndex using the commmitment's R and C values */
+                betIndex: 0,
+                mask: state!.mask,
+                /** TODO: Calc */
+                pA: [69n, 69n],
+                pB: [
+                  /** TODO: Calc */
+                  [69n, 69n],
+                  /** TODO: Calc */
+                  [69n, 69n],
+                ],
+                /** TODO: Calc */
+                pC: [69n, 69n],
+                recipient: walletClient?.account.address as Address,
+                relayer: walletClient?.account.address as Address,
+                fee: 0n,
+                refund: 0n,
+              })
+            }
+          >
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
+          </Button>
+          <Button
+            disabled={!state}
+            variant="outline"
+            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            onClick={() => {}}
+          >
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'Collect'}
           </Button>
         </div>
         <div className="w-1/2 flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap">Status:{status}</p>
         </div>
       </div>
+
       <div className="flex-grow flex items-end justify-center">
         <p>&copy; FOOM AI corporation 2025</p>
       </div>
