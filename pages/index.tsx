@@ -16,6 +16,8 @@ import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
 import { generateCommitment } from '@/lib/lottery/generateCommitment'
 import SpinnerText from '@/components/shared/spinner-text'
 import type { ICancelBetArgs, ICommitment } from '@/types/lottery'
+import { generateWitness } from '@/lib/lottery/generateWitness'
+import { useLeaves } from '@/lib/lottery/hooks/useLeaves'
 
 const generateValidBetAmounts = (betMin = 1, maxPower = 22) =>
   Array.from({ length: maxPower + 1 }, (_, i) => betMin * (2 + 2 ** i))
@@ -35,8 +37,13 @@ export default function Home() {
   })
   const walletClient = useWalletClient().data
   const publicClient = usePublicClient()
+  const { data: leaves, isLoading: isLeavesLoading } = useLeaves({
+    fromBlock: 0n /** @dev FoomLottery.sol deployment block */,
+    inR: state?.R,
+    inC: state?.C,
+  })
 
-  const handleStatus = (data: string) => setStatus(prev => `${prev}\n\n> ${data}`)
+  const handleStatus = (data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`)
 
   const play = async (amount: number, commitment: string) => {
     if (!walletClient || !publicClient) {
@@ -68,14 +75,13 @@ export default function Home() {
 
   const playLotteryMutation = useMutation<TransactionReceipt, Error, number>({
     mutationFn: async (amount: number) => {
-      /** @dev TODO: Need to generate the commitment this many times until it validates correctly with the `0<_secrethash &&_secrethash < FIELD_SIZE` requirement. */
       const commitment = await generateCommitment([
         `0x${Number(amount).toString(16)}`,
         0 /** @dev custom commitment input hash */,
       ])
       handleStatus(`Commitment: ${JSON.stringify(commitment, null, 2)}`)
 
-      const result = await play(amount, commitment.ticket)
+      const result = await play(amount, `${commitment.hash}`)
       setState(commitment)
 
       return result
@@ -89,24 +95,110 @@ export default function Home() {
     },
   })
 
+  type FormattedProof = {
+    pi_a: [bigint, bigint],
+    pi_b: [[bigint, bigint], [bigint, bigint]],
+    pi_c: [bigint, bigint]
+  }
+
+  function formatProofForContract(proof: any): FormattedProof {
+    return {
+      pi_a: [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],
+      pi_b: [
+        [BigInt(proof.pi_b[0][1]), BigInt(proof.pi_b[0][0])],
+        [BigInt(proof.pi_b[1][1]), BigInt(proof.pi_b[1][0])],
+      ],
+      pi_c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])]
+    }
+  }
+
   const cancelBetMutation = useMutation({
-    mutationFn: async ({ betIndex, mask, pA, pB, pC, recipient, relayer, fee = 0n, refund = 0n }: ICancelBetArgs) => {
-      if (!walletClient || !publicClient) {
-        throw new Error('Wallet not connected')
+    mutationFn: async () => {
+      if (!walletClient || !publicClient || !state) {
+        throw new Error('Missing wallet, client, or commitment state')
       }
+
+      const betIndex = leaves?.index
+
+      const { proof } = await generateWitness({
+        R: state.R,
+        C: state.C,
+        mask: state.mask,
+      })
+
+      const { pi_a: pA, pi_b: pB, pi_c: pC } = formatProofForContract(proof)
+
+      const recipient = walletClient.account.address as Address
+      const relayer = walletClient.account.address as Address
+      const fee = 0n
+      const refund = 0n
 
       const { request } = await publicClient.simulateContract({
         address: ETH_LOTTERY_ADDRESS,
         abi: EthLotteryAbi,
         functionName: 'cancelbet',
-        args: [betIndex, mask, pA, pB, pC, recipient, relayer, fee, refund],
+        args: [betIndex, state.mask, pA, pB, pC, recipient, relayer, fee, refund],
         value: refund,
         account: walletClient.account.address,
       })
 
       const txHash = await walletClient.writeContract(request)
       const txReceipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
+
       setState(undefined)
+      return txReceipt
+    },
+  })
+
+  const collectRewardMutation = useMutation({
+    mutationFn: async ({
+      secret,
+      mask,
+      rand,
+      recipient,
+      relayer,
+      fee = 0n,
+      refund = 0n,
+      invest = 0n,
+      leaves,
+    }: {
+      secret: bigint
+      mask: bigint
+      rand: bigint
+      recipient: `0x${string}`
+      relayer: `0x${string}`
+      fee?: bigint
+      refund?: bigint
+      invest?: bigint
+      leaves: bigint[]
+    }) => {
+      if (!walletClient || !publicClient) {
+        throw new Error('Wallet not connected')
+      }
+
+      const {
+        proof,
+        publicSignals: { root, nullifierHash, rew1, rew2, rew3 },
+      } = await generateWitness([secret, mask, rand, recipient, relayer, fee, refund, ...leaves])
+
+      const pA = proof.pi_a.slice(0, 2) as [bigint, bigint]
+      const pB = [
+        [proof.pi_b[0][1], proof.pi_b[0][0]],
+        [proof.pi_b[1][1], proof.pi_b[1][0]],
+      ] as [[bigint, bigint], [bigint, bigint]]
+      const pC = proof.pi_c.slice(0, 2) as [bigint, bigint]
+
+      const { request } = await publicClient.simulateContract({
+        address: ETH_LOTTERY_ADDRESS,
+        abi: EthLotteryAbi,
+        functionName: 'collect',
+        args: [pA, pB, pC, root, nullifierHash, recipient, relayer, fee, refund, rew1, rew2, rew3, invest],
+        value: refund,
+        account: walletClient.account.address,
+      })
+
+      const txHash = await walletClient.writeContract(request)
+      const txReceipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
 
       return txReceipt
     },
@@ -149,27 +241,7 @@ export default function Home() {
             disabled={!state}
             variant="outline"
             className="mt-2 mb-4 disabled:!cursor-not-allowed"
-            onClick={() =>
-              cancelBetMutation.mutateAsync({
-                /** TODO: Dynamically find the betIndex using the commmitment's R and C values */
-                betIndex: 0,
-                mask: state!.mask,
-                /** TODO: Calc */
-                pA: [69n, 69n],
-                pB: [
-                  /** TODO: Calc */
-                  [69n, 69n],
-                  /** TODO: Calc */
-                  [69n, 69n],
-                ],
-                /** TODO: Calc */
-                pC: [69n, 69n],
-                recipient: walletClient?.account.address as Address,
-                relayer: walletClient?.account.address as Address,
-                fee: 0n,
-                refund: 0n,
-              })
-            }
+            onClick={() => cancelBetMutation.mutateAsync()}
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
           </Button>
@@ -177,10 +249,46 @@ export default function Home() {
             disabled={!state}
             variant="outline"
             className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            onClick={() => {
+              if (!state || !leaves) {
+                return
+              }
+
+              collectRewardMutation.mutate({
+                secret: state.secret,
+                mask: state.mask,
+                rand: BigInt(leaves.rand),
+                recipient: walletClient?.account.address as Address,
+                relayer: walletClient?.account.address as Address,
+                fee: 0n,
+                refund: 0n,
+                invest: 0n,
+                leaves: leaves.data,
+              })
+            }}
+          >
+            {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
+          </Button>
+
+          <Button
+            disabled={!state}
+            variant="outline"
+            className="mt-2 mb-4 disabled:!cursor-not-allowed"
             onClick={() => {}}
           >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'Collect'}
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'Admin: commit & reveal'}
           </Button>
+          <Button
+            disabled={!state}
+            variant="outline"
+            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            onClick={() => {}}
+          >
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'Restore leftover ETH (.payOut)'}
+          </Button>
+        </div>
+        <div className="w-1/2 flex flex-col mb-2">
+          <p className="w-full break-all whitespace-pre-wrap italic font-bold">Lottery Ticket: {state?.ticket}</p>
         </div>
         <div className="w-1/2 flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap">Status:{status}</p>
