@@ -4,7 +4,15 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation } from '@tanstack/react-query'
-import { createPublicClient, createWalletClient, http, parseEther, type Address, type TransactionReceipt } from 'viem'
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  keccak256,
+  parseEther,
+  type Address,
+  type TransactionReceipt,
+} from 'viem'
 import { waitForTransactionReceipt } from 'viem/actions'
 import { usePublicClient, useWalletClient } from 'wagmi'
 
@@ -18,6 +26,9 @@ import SpinnerText from '@/components/shared/spinner-text'
 import type { ICancelBetArgs, ICommitment } from '@/types/lottery'
 import { generateWitness } from '@/lib/lottery/generateWitness'
 import { useLeaves } from '@/lib/lottery/hooks/useLeaves'
+import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
+import { getLotteryStatus } from '@/lib/lottery/utils/getLotteryStatus'
+import { toast } from 'sonner'
 
 const generateValidBetAmounts = (betMin = 1, maxPower = 22) =>
   Array.from({ length: maxPower + 1 }, (_, i) => betMin * (2 + 2 ** i))
@@ -88,6 +99,7 @@ export default function Home() {
     },
     onError: (error: any) => {
       _error(error)
+      toast(error.cause.reason || `${error}` || error?.message)
       handleStatus(`Error: ${error.message}`)
     },
     onSuccess: receipt => {
@@ -96,8 +108,8 @@ export default function Home() {
   })
 
   type FormattedProof = {
-    pi_a: [bigint, bigint],
-    pi_b: [[bigint, bigint], [bigint, bigint]],
+    pi_a: [bigint, bigint]
+    pi_b: [[bigint, bigint], [bigint, bigint]]
     pi_c: [bigint, bigint]
   }
 
@@ -108,7 +120,7 @@ export default function Home() {
         [BigInt(proof.pi_b[0][1]), BigInt(proof.pi_b[0][0])],
         [BigInt(proof.pi_b[1][1]), BigInt(proof.pi_b[1][0])],
       ],
-      pi_c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])]
+      pi_c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])],
     }
   }
 
@@ -147,6 +159,78 @@ export default function Home() {
 
       setState(undefined)
       return txReceipt
+    },
+    onError: (error: any) => {
+      _error(error)
+      toast(error.cause.reason || `${error}` || error?.message)
+      handleStatus(`Error: ${error.message}`)
+    },
+    onSuccess: receipt => {
+      handleStatus(`TX hash: ${JSON.stringify(receipt, null, 2)}`)
+    },
+  })
+
+  const commitMutation = useMutation({
+    mutationFn: async () => {
+      if (!walletClient || !publicClient) {
+        throw new Error('Wallet not connected')
+      }
+
+      const [, commitCount] = await getLotteryStatus(publicClient)
+
+      const revealSecret = keccak256Uint(commitCount)
+      const revealSecretBigInt = BigInt(revealSecret)
+      const commitHash = keccak256Uint(revealSecretBigInt)
+
+      const { request } = await publicClient.simulateContract({
+        address: ETH_LOTTERY_ADDRESS,
+        abi: EthLotteryAbi,
+        functionName: 'commit',
+        args: [commitHash],
+        account: walletClient.account.address,
+      })
+
+      const txHash = await walletClient.writeContract(request)
+      return await waitForTransactionReceipt(publicClient, { hash: txHash })
+    },
+    onError: (error: any) => {
+      _error(error)
+      toast(error.cause.reason || `${error}` || error?.message)
+      handleStatus(`Error: ${error.message}`)
+    },
+    onSuccess: receipt => {
+      handleStatus(`TX hash: ${JSON.stringify(receipt, null, 2)}`)
+    },
+  })
+
+  const revealMutation = useMutation({
+    mutationFn: async () => {
+      if (!walletClient || !publicClient) {
+        throw new Error('Wallet not connected')
+      }
+
+      const [, commitCount] = await getLotteryStatus(publicClient)
+
+      const revealSecret = keccak256Abi(commitCount)
+
+      const { request } = await publicClient.simulateContract({
+        address: ETH_LOTTERY_ADDRESS,
+        abi: EthLotteryAbi,
+        functionName: 'reveal',
+        args: [revealSecret],
+        account: walletClient.account.address,
+      })
+
+      const txHash = await walletClient.writeContract(request)
+      return await waitForTransactionReceipt(publicClient, { hash: txHash })
+    },
+    onError: (error: any) => {
+      _error(error)
+      toast(error.cause.reason || `${error}` || error?.message)
+      handleStatus(`Error: ${error.message}`)
+    },
+    onSuccess: receipt => {
+      handleStatus(`TX hash: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
@@ -202,6 +286,14 @@ export default function Home() {
 
       return txReceipt
     },
+    onError: (error: any) => {
+      _error(error)
+      toast(error.cause.reason || `${error}` || error?.message)
+      handleStatus(`Error: ${error.message}`)
+    },
+    onSuccess: receipt => {
+      handleStatus(`TX hash: ${JSON.stringify(receipt, null, 2)}`)
+    },
   })
 
   return (
@@ -211,7 +303,7 @@ export default function Home() {
         <h1 className="text-2xl">FOOM Lottery</h1>
         <appkit-button />
 
-        <div className="flex flex-col gap-2 justify-center mt-8 w-1/4">
+        <div className="flex flex-col gap-2 justify-center mt-8 mb-8">
           <form onSubmit={form.handleSubmit(data => console.log(data))}>
             <div>
               <label className="text-xs text-tertiary italic">Amount of ETH to deposit</label>
@@ -238,17 +330,15 @@ export default function Home() {
             {playLotteryMutation.isPending ? <SpinnerText /> : 'Play'}
           </Button>
           <Button
-            disabled={!state}
             variant="outline"
-            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            className="mt-2 disabled:!cursor-not-allowed"
             onClick={() => cancelBetMutation.mutateAsync()}
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
           </Button>
           <Button
-            disabled={!state}
             variant="outline"
-            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            className="mt-2 disabled:!cursor-not-allowed"
             onClick={() => {
               if (!state || !leaves) {
                 return
@@ -269,28 +359,34 @@ export default function Home() {
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
           </Button>
-
           <Button
-            disabled={!state}
             variant="outline"
-            className="mt-2 mb-4 disabled:!cursor-not-allowed"
-            onClick={() => {}}
-          >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'Admin: commit & reveal'}
-          </Button>
-          <Button
-            disabled={!state}
-            variant="outline"
-            className="mt-2 mb-4 disabled:!cursor-not-allowed"
+            className="mt-2 disabled:!cursor-not-allowed mb-4"
             onClick={() => {}}
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'Restore leftover ETH (.payOut)'}
           </Button>
+
+          <Button
+            variant="outline"
+            className="mt-2 disabled:!cursor-not-allowed"
+            onClick={() => commitMutation.mutateAsync()}
+          >
+            {commitMutation.isPending ? <SpinnerText /> : '[Admin]: Commit'}
+          </Button>
+
+          <Button
+            variant="outline"
+            className="mt-2 disabled:!cursor-not-allowed"
+            onClick={() => revealMutation.mutateAsync()}
+          >
+            {revealMutation.isPending ? <SpinnerText /> : '[Admin]: Reveal'}
+          </Button>
         </div>
-        <div className="w-1/2 flex flex-col mb-2">
+        <div className="w-full max-w-[835px] flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap italic font-bold">Lottery Ticket: {state?.ticket}</p>
         </div>
-        <div className="w-1/2 flex flex-col mb-2">
+        <div className="w-full max-w-[835px] flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap">Status:{status}</p>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import '@/styles/globals.css'
 import '@/lib/utils/node'
 import { Providers } from '@/providers'
+import { Toaster } from '@/components/ui/sonner'
 
 interface IAppProps extends AppProps {
   cookies: string | null
@@ -41,6 +42,7 @@ function App({ Component, pageProps }: IAppProps) {
       <main className={`${ibmPlexSans.className} ${ibmPlexMono.className}`}>
         <Component {...pageProps} />
       </main>
+      <Toaster />
     </Providers>
   )
 }
