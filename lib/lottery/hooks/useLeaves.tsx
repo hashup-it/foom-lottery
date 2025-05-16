@@ -1,26 +1,23 @@
-import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
 import { useQuery } from '@tanstack/react-query'
-import { parseAbiItem } from 'viem'
 import { usePublicClient } from 'wagmi'
+import { parseAbiItem, decodeEventLog } from 'viem'
+import { mimcsponge2 } from '@/lib/lottery/utils/mimcsponge'
+import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
+import { EthLotteryAbi } from '@/abis/eth-lottery'
+import { _log } from '@/lib/utils/ts'
 
-const LOG_BET_HASH_EVENT = parseAbiItem('event LogBetHash(uint256 index, uint256 rand, uint256 leaf)')
-const LOG_BET_IN_EVENT = parseAbiItem('event LogBetIn(uint256 index, uint256 R, uint256 C)')
+const LOG_BET_HASH_EVENT = parseAbiItem('event LogBetHash(uint256 index, uint256 newRand, uint256 newHash)')
+const LOG_BET_IN_EVENT = parseAbiItem('event LogBetIn(uint256 index, uint256 newHash)')
 
-export function useLeaves({ fromBlock = 0n, inR, inC }: { fromBlock?: bigint; inR?: bigint; inC?: bigint }) {
+export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
   const publicClient = usePublicClient()
 
   return useQuery({
-    queryKey: ['leaves', fromBlock, inR, inC],
+    queryKey: ['leaves', fromBlock],
     queryFn: async () => {
-      if (!publicClient) {
-        throw new Error('No public client')
-      }
+      if (!publicClient) throw new Error('No public client')
 
-      if (inR === undefined && inC === undefined) {
-        return null
-      }
-
-      const [betIns, betHashes] = await Promise.all([
+      const [rawBetIns, rawBetHashes] = await Promise.all([
         publicClient.getLogs({
           address: ETH_LOTTERY_ADDRESS,
           event: LOG_BET_IN_EVENT,
@@ -35,36 +32,52 @@ export function useLeaves({ fromBlock = 0n, inR, inC }: { fromBlock?: bigint; in
         }),
       ])
 
-      const match = betIns.find((log: any) => log.args.R === inR && log.args.C === inC)
+      const betIns = rawBetIns.map(log =>
+        decodeEventLog({
+          abi: EthLotteryAbi,
+          data: log.data,
+          topics: log.topics,
+        })
+      )
+      const betHashes = rawBetHashes.map(log =>
+        decodeEventLog({
+          abi: EthLotteryAbi,
+          data: log.data,
+          topics: log.topics,
+        })
+      )
 
-      if (!match) {
-        throw new Error('Matching LogBetIn not found')
-      }
-
-      const targetIndex = match.args.index
+      _log('Decoded BetIns:', betIns)
+      _log('Decoded BetHashes:', betHashes)
 
       const leaves: bigint[] = []
-      let rand: bigint | undefined
-      let leaf: bigint | undefined
+      let lastIndex: bigint = -1n
+      let lastRand: bigint | undefined
+      let lastHash: bigint | undefined
 
       for (const log of betHashes) {
-        if (log.args.leaf !== undefined) {
-          leaves.push(log.args.leaf)
+        const {
+          index,
+          newRand: rand,
+          newHash: hash,
+        } = log.args as any as {
+          index: bigint
+          newRand: bigint
+          newHash: bigint
         }
-        if (log.args.index === targetIndex) {
-          rand = log.args.rand
-          leaf = log.args.leaf
-        }
-      }
 
-      if (!rand || !leaf) {
-        throw new Error('Matching LogBetHash not found')
+        const leaf = await mimcsponge2(hash, rand + index)
+        leaves.push(leaf)
+
+        lastIndex = index
+        lastRand = rand
+        lastHash = hash
       }
 
       return {
-        index: targetIndex,
-        rand,
-        leaf,
+        index: lastIndex,
+        newRand: lastRand,
+        newHash: lastHash,
         data: leaves,
       }
     },

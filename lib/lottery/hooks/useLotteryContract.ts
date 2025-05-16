@@ -4,12 +4,14 @@ import { parseEther, type Address, type TransactionReceipt, encodePacked, keccak
 import { waitForTransactionReceipt } from 'viem/actions'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
-import { generateCommitment } from '@/lib/lottery/generateCommitment'
-import { generateWitness } from '@/lib/lottery/generateWitness'
+import { generateWithdraw } from '@/lib/lottery/withdraw'
+import { generateUpdate } from '@/lib/lottery/update'
+import { getHash } from '@/lib/lottery/getHash'
 import { getLotteryStatus } from '@/lib/lottery/utils/getLotteryStatus'
 import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
-import type { ICommitment } from '@/types/lottery'
 import { toast } from 'sonner'
+import { _error, _log } from '@/lib/utils/ts'
+import type { mask } from 'ethers'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -33,88 +35,188 @@ export function useLotteryContract({
 }: {
   onStatus?: (msg: string) => void
 } = {}) {
-  const walletClient = useWalletClient().data
+  const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
 
   const handleStatus = (data: string) => {
-    if (onStatus) onStatus(data)
+    onStatus?.(data)
   }
 
-  const playMutation = useMutation<
-    { receipt: TransactionReceipt | undefined; commitment: ICommitment },
-    Error,
-    { amount: number; commitmentInput?: number }
-  >({
-    mutationFn: async ({ amount, commitmentInput = 0 }) => {
+  const playMutation = useMutation({
+    mutationFn: async ({ power, commitmentInput = 0 }: { power: number; commitmentInput?: number }) => {
       try {
-        if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-        const commitment = await generateCommitment([`0x${Number(amount).toString(16)}`, commitmentInput])
-        handleStatus?.(`Commitment: ${JSON.stringify(commitment, null, 2)}`)
+        if (!walletClient || !publicClient) {
+          throw new Error('Wallet not connected')
+        }
+
+        handleStatus(`Generating commitment...`)
+        const { hash, secret_power } = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
+        const clampedHash = hash % 2n ** 256n
+
+        handleStatus(`Commitment Hash: 0x${hash.toString(16)}`)
+
+        const amount = 2 + 2 ** Number(power)
         const { request } = await publicClient.simulateContract({
           address: ETH_LOTTERY_ADDRESS,
           abi: EthLotteryAbi,
           functionName: 'play',
-          args: [commitment.hash, 0],
-          value: parseEther(amount.toString()),
+          args: [clampedHash, BigInt(power)],
+          value: parseEther(`${amount}`),
           account: walletClient.account.address,
         })
-        handleStatus?.('Sending transaction...')
+
+        handleStatus('Sending transaction...')
         const txHash = await walletClient.writeContract(request)
-        handleStatus?.(`Transaction sent: ${txHash}`)
-        const receipt = await waitForTransactionReceipt(walletClient, { hash: txHash })
-        return { receipt, commitment }
+        handleStatus(`Transaction sent: ${txHash}`)
+
+        const receipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
+
+        const secret = secret_power >> 8n
+
+        return { receipt, secretPower: secret_power, secret, hash }
       } catch (error: any) {
-        toast(error?.cause?.reason || `${error}` || error?.message)
-        handleStatus?.(`Error: ${error.message}`)
-        throw error
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
       }
     },
-    onSuccess: ({ receipt }) => {
-      receipt ? handleStatus?.(`TX hash: ${JSON.stringify(receipt, null, 2)}`) : null
+    onSuccess: receipt => {
+      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
-  const cancelBetMutation = useMutation<TransactionReceipt | undefined, Error, { state: ICommitment; leaves: any }>({
-    mutationFn: async ({ state, leaves }) => {
+  const cancelBetMutation = useMutation({
+    mutationFn: async ({
+      secret,
+      power,
+      index,
+      leaves,
+    }: {
+      secret: bigint
+      power: bigint
+      index: number
+      leaves: bigint[]
+    }) => {
       try {
-        if (!walletClient || !publicClient || !state) throw new Error('Missing wallet, client, or commitment state')
-        const betIndex = leaves?.index
-        const { proof } = await generateWitness({ R: state.R, C: state.C, mask: state.mask })
-        const { pi_a: pA, pi_b: pB, pi_c: pC } = formatProofForContract(proof)
+        if (!walletClient || !publicClient) throw new Error('Wallet/client missing')
+
+        // Generate ZK proof using rand = 0n for cancel
+        const {
+          proof,
+          publicSignals: { root, nullifier, reward1, reward2, reward3 },
+        } = await generateWithdraw({
+          secret,
+          power,
+          rand: 0n,
+          recipient: walletClient.account.address,
+          relayer: walletClient.account.address,
+          fee: 0n,
+          refund: 0n,
+          leaves,
+        })
+
+        const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
         const recipient = walletClient.account.address as Address
         const relayer = walletClient.account.address as Address
         const fee = 0n
         const refund = 0n
+
         const { request } = await publicClient.simulateContract({
           address: ETH_LOTTERY_ADDRESS,
           abi: EthLotteryAbi,
           functionName: 'cancelbet',
-          args: [betIndex, state.mask, pA, pB, pC, recipient, relayer, fee, refund],
+          args: [index, pi_a, pi_b, pi_c, recipient, relayer, fee, refund],
           value: refund,
           account: walletClient.account.address,
         })
+
         const txHash = await walletClient.writeContract(request)
-        const txReceipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
-        return txReceipt
+        return await waitForTransactionReceipt(publicClient, { hash: txHash })
       } catch (error: any) {
-        toast(error?.cause?.reason || `${error}` || error?.message)
-        handleStatus?.(`Error: ${error.message}`)
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
       }
     },
     onSuccess: receipt => {
-      receipt ? handleStatus?.(`TX hash: ${JSON.stringify(receipt, null, 2)}`) : null
+      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
-  const commitMutation = useMutation<TransactionReceipt | undefined, Error, void>({
+  const collectRewardMutation = useMutation({
+    mutationFn: async ({
+      secret,
+      power,
+      rand,
+      recipient,
+      relayer,
+      fee = 0n,
+      refund = 0n,
+      leaves,
+    }: {
+      secret: bigint
+      power: bigint
+      rand: bigint
+      recipient: Address
+      relayer: Address
+      fee?: bigint
+      refund?: bigint
+      leaves: bigint[]
+    }) => {
+      try {
+        if (!walletClient || !publicClient) throw new Error('Wallet not connected')
+
+        const withdrawOutput = await generateWithdraw({
+          secret,
+          power,
+          rand,
+          recipient,
+          relayer,
+          fee,
+          refund,
+          leaves,
+        })
+
+        if (typeof withdrawOutput !== 'object' || !withdrawOutput.proof || !withdrawOutput.publicSignals) {
+          throw new Error('Invalid withdraw proof format')
+        }
+
+        const {
+          proof,
+          publicSignals: { root, nullifier, reward1, reward2, reward3 },
+        } = withdrawOutput
+
+        const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
+
+        const { request } = await publicClient.simulateContract({
+          address: ETH_LOTTERY_ADDRESS,
+          abi: EthLotteryAbi,
+          functionName: 'collect',
+          args: [pi_a, pi_b, pi_c, root, nullifier, reward1, reward2, reward3, recipient, relayer, fee, refund],
+          value: refund,
+          account: walletClient.account.address,
+        })
+
+        const txHash = await walletClient.writeContract(request)
+        return await waitForTransactionReceipt(publicClient, { hash: txHash })
+      } catch (error: any) {
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
+      }
+    },
+    onSuccess: receipt => {
+      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
+    },
+  })
+
+  const commitMutation = useMutation({
     mutationFn: async () => {
       try {
         if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-        const lotteryStatus = await getLotteryStatus(publicClient)
-        const [, commitCount] = lotteryStatus
+        const [, commitCount] = await getLotteryStatus(publicClient)
         const revealSecret = keccak256Uint(commitCount)
-        const revealSecretBigInt = BigInt(revealSecret)
-        const commitHash = keccak256Uint(revealSecretBigInt)
+        const commitHash = keccak256Uint(BigInt(revealSecret))
         const { request } = await publicClient.simulateContract({
           address: ETH_LOTTERY_ADDRESS,
           abi: EthLotteryAbi,
@@ -123,103 +225,100 @@ export function useLotteryContract({
           account: walletClient.account.address,
         })
         const txHash = await walletClient.writeContract(request)
-        return await waitForTransactionReceipt(publicClient, { hash: txHash })
+        const result = await waitForTransactionReceipt(publicClient, { hash: txHash })
+
+        await walletClient.writeContract({
+          address: ETH_LOTTERY_ADDRESS,
+          abi: EthLotteryAbi,
+          functionName: 'rememberHash',
+          account: walletClient.account.address,
+        })
+        _log('Remember hash succeeded.')
+
+        return result
       } catch (error: any) {
-        toast(error?.cause?.reason || `${error}` || error?.message)
-        handleStatus?.(`Error: ${error.message}`)
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
       }
     },
     onSuccess: receipt => {
-      receipt ? handleStatus?.(`TX hash: ${JSON.stringify(receipt, null, 2)}`) : null
+      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
-  const revealMutation = useMutation<TransactionReceipt | undefined, Error, void>({
-    mutationFn: async () => {
+  const revealMutation = useMutation({
+    mutationFn: async ({
+      oldRand,
+      oldLeaves,
+      newHashes,
+    }: {
+      oldRand: bigint
+      oldLeaves: bigint[]
+      newHashes: bigint[]
+    }) => {
       try {
         if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-        const [, commitCount] = await getLotteryStatus(publicClient)
-        const revealSecretHex = keccak256(encodePacked(['uint256'], [commitCount]))
-        const revealSecret = BigInt(revealSecretHex)
+
+        const [nextIndex, , , commitBlock] = await getLotteryStatus(publicClient)
+        const revealSecret = BigInt(keccak256(encodePacked(['uint256'], [nextIndex])))
+
+        const block = await publicClient.getBlock({ blockNumber: BigInt(commitBlock) })
+        const commitBlockHash = block.hash!
+        const newRand = BigInt(keccak256(encodePacked(['uint256', 'bytes32'], [revealSecret, commitBlockHash])))
+
+        const { proof, newRoot } = await generateUpdate({
+          oldRand,
+          newRand,
+          newHashes,
+          oldLeaves,
+        })
+
+        const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
+
         const { request } = await publicClient.simulateContract({
           address: ETH_LOTTERY_ADDRESS,
           abi: EthLotteryAbi,
           functionName: 'reveal',
-          args: [revealSecret],
+          args: [revealSecret, pi_a, pi_b, pi_c, newRoot],
           account: walletClient.account.address,
         })
-        const txHash = await walletClient.writeContract(request)
-        return await waitForTransactionReceipt(publicClient, { hash: txHash })
-      } catch (error: any) {
-        toast(error?.cause?.reason || `${error}` || error?.message)
-        handleStatus?.(`Error: ${error.message}`)
-      }
-    },
-    onSuccess: receipt => {
-      receipt ? handleStatus?.(`TX hash: ${JSON.stringify(receipt, null, 2)}`) : null
-    },
-  })
 
-  const collectRewardMutation = useMutation<
-    TransactionReceipt | undefined,
-    Error,
-    {
-      secret: bigint
-      mask: bigint
-      rand: bigint
-      recipient: `0x${string}`
-      relayer: `0x${string}`
-      fee?: bigint
-      refund?: bigint
-      invest?: bigint
-      leaves: bigint[]
-    }
-  >({
-    mutationFn: async ({ secret, mask, rand, recipient, relayer, fee = 0n, refund = 0n, invest = 0n, leaves }) => {
-      try {
-        if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-        const {
-          proof,
-          publicSignals: { root, nullifierHash, rew1, rew2, rew3 },
-        } = await generateWitness([secret, mask, rand, recipient, relayer, fee, refund, ...leaves])
-        const pA = proof.pi_a.slice(0, 2) as [bigint, bigint]
-        const pB = [
-          [proof.pi_b[0][1], proof.pi_b[0][0]],
-          [proof.pi_b[1][1], proof.pi_b[1][0]],
-        ] as [[bigint, bigint], [bigint, bigint]]
-        const pC = proof.pi_c.slice(0, 2) as [bigint, bigint]
-        const { request } = await publicClient.simulateContract({
+        await walletClient.writeContract({
           address: ETH_LOTTERY_ADDRESS,
           abi: EthLotteryAbi,
-          functionName: 'collect',
-          args: [pA, pB, pC, root, nullifierHash, recipient, relayer, fee, refund, rew1, rew2, rew3, invest],
-          value: refund,
+          functionName: 'rememberHash',
           account: walletClient.account.address,
         })
+        _log('Remember hash succeeded.')
+
+        _log('Writing reveal TX...')
         const txHash = await walletClient.writeContract(request)
-        const txReceipt = await waitForTransactionReceipt(publicClient, { hash: txHash })
-        return txReceipt
+        const result = await waitForTransactionReceipt(publicClient, { hash: txHash })
+
+        return result
       } catch (error: any) {
-        toast(error?.cause?.reason || `${error}` || error?.message)
-        handleStatus?.(`Error: ${error.message}`)
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
       }
     },
     onSuccess: receipt => {
-      receipt ? handleStatus?.(`TX hash: ${JSON.stringify(receipt, null, 2)}`) : null
+      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
     },
   })
 
   return {
     playMutation,
     cancelBetMutation,
+    collectRewardMutation,
     commitMutation,
     revealMutation,
-    collectRewardMutation,
     formatProofForContract,
     keccak256Abi,
     keccak256Uint,
     getLotteryStatus,
-    generateCommitment,
-    generateWitness,
+    getHash,
+    generateWithdraw,
   }
 }

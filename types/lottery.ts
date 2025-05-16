@@ -1,23 +1,24 @@
 export interface ICommitment {
-  /** @dev The ETH amount used for the bet (e.g., 3) */
-  amount: bigint
-  /** @dev Ticket = (secret << 8) | index — reconstructable input */
-  ticket: bigint
-  /** @dev Secret input used to compute commitment and proof */
+  /** Secret input used to derive the hash */
   secret: bigint
-  mask: bigint
+  /** Power input (used in mask, reward calc) */
+  power: bigint
+  /** Random value used for uniqueness and Merkle path */
+  rand: bigint
+  /** Leaf index in the Merkle tree */
+  index: number
+  /** The computed commitment hash (uint256, < 2^256) */
   hash: bigint
-  R: bigint
-  C: bigint
-  data: string
+  /** Optional full Merkle leaf set for proof generation */
+  leaves: bigint[]
 }
 
 export interface ICancelBetArgs {
   betIndex: number
   mask: bigint
-  pA: [bigint, bigint]
-  pB: [[bigint, bigint], [bigint, bigint]]
-  pC: [bigint, bigint]
+  pi_a: [bigint, bigint]
+  pi_b: [[bigint, bigint], [bigint, bigint]]
+  pi_c: [bigint, bigint]
   recipient: `0x${string}`
   relayer: `0x${string}`
   fee?: bigint

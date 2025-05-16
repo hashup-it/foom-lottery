@@ -20,9 +20,9 @@ const networks: [AppKitNetwork, ...AppKitNetwork[]] = isDevelopment()
 
 const metadata: Metadata = {
   name: 'FOOM',
-  description: 'FOOM Club landing page',
-  url: 'https://foom.club',
-  icons: ['https://foom.club/icon.png'],
+  description: 'FOOM Lottery website',
+  url: 'https://foom-lottery.hashup.it',
+  icons: ['https://foom-lottery.hashup.it/icon.png'],
 }
 
 export const wagmiAdapter = new WagmiAdapter({

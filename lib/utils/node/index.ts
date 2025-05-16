@@ -7,7 +7,7 @@ import { stringify } from 'viem'
 
 /* @ts-ignore */
 BigInt.prototype.toJSON = function () {
-  return this.toString()
+  return `0x${this.toString(16)}`
 }
 
 const intToBuffer = (value: bigint, length: number = 8, offset: number = 0): Buffer => {

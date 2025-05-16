@@ -9,3 +9,21 @@ type UniqueByKey<T> = (array: T[], key: keyof T) => T[]
 export const removeDuplicatesByKey: UniqueByKey<any> = (array, key) => {
   return array.filter((obj1, i, arr) => arr.findIndex(obj2 => obj2[key] === obj1[key]) === i)
 }
+
+export const getLastHash = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const stored = localStorage.getItem('lotteryHashes')
+  if (stored) {
+    try {
+      const hashes = JSON.parse(stored)
+      return hashes[hashes.length - 1]
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}

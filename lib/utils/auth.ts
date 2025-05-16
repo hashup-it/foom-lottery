@@ -1,7 +1,6 @@
 import { Address, zeroAddress } from 'viem'
 import jwt from 'jsonwebtoken'
 import { tryParse } from '@/lib/utils/node'
-import type { ITwitterAuth } from '@/types/auth'
 
 enum EAuthType {
   Local,
@@ -31,8 +30,6 @@ const getAuth = (address: Address) => {
 }
 const getAuthKey = (address: Address) => `jwt-appkit`
 
-const getTwitterAuth = () => tryParse<ITwitterAuth>(localStorage.getItem('twitter'))
-
 const isAuthExpired = () => {
   const auth = getAuth(zeroAddress)
   const decoded = decodeAuth(auth?.token || '')
@@ -45,4 +42,4 @@ const isAuthExpired = () => {
   return false
 }
 
-export { decodeAuth, getSignMessage, getAuthHeaders, getAuthKey, getAuth, getTwitterAuth, isAuthExpired }
+export { decodeAuth, getSignMessage, getAuthHeaders, getAuthKey, getAuth, isAuthExpired }
