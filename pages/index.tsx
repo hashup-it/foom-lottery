@@ -41,7 +41,6 @@ export default function Home() {
   )
   const { data: leaves, isLoading: isLeavesLoading } = useLeaves({
     fromBlock: 0n,
-    inHash: BigInt(lotteryHashes?.at(-1) || 0),
   })
   const power = form.watch('power')
 
