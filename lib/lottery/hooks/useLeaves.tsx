@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { usePublicClient } from 'wagmi'
 import { parseAbiItem, decodeEventLog } from 'viem'
-import { mimcsponge2 } from '@/lib/lottery/utils/mimcsponge'
+import { mimcsponge3 } from '@/lib/lottery/utils/mimcsponge'
 import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { _log } from '@/lib/utils/ts'
 
-const LOG_BET_HASH_EVENT = parseAbiItem('event LogBetHash(uint256 index, uint256 newRand, uint256 newHash)')
 const LOG_BET_IN_EVENT = parseAbiItem('event LogBetIn(uint256 index, uint256 newHash)')
+const LOG_UPDATE_EVENT = parseAbiItem('event LogUpdate(uint256 index, uint256 newRand, uint256 newRoot)')
 
 export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
   const publicClient = usePublicClient()
@@ -17,7 +17,7 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
     queryFn: async () => {
       if (!publicClient) throw new Error('No public client')
 
-      const [rawBetIns, rawBetHashes] = await Promise.all([
+      const [rawBetIns, rawUpdates] = await Promise.all([
         publicClient.getLogs({
           address: ETH_LOTTERY_ADDRESS,
           event: LOG_BET_IN_EVENT,
@@ -26,7 +26,7 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
         }),
         publicClient.getLogs({
           address: ETH_LOTTERY_ADDRESS,
-          event: LOG_BET_HASH_EVENT,
+          event: LOG_UPDATE_EVENT,
           fromBlock,
           toBlock: 'latest',
         }),
@@ -38,37 +38,38 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
           data: log.data,
           topics: log.topics,
         })
-      )
-      const betHashes = rawBetHashes.map(log =>
+      ) as any
+
+      const updates = rawUpdates.map(log =>
         decodeEventLog({
           abi: EthLotteryAbi,
           data: log.data,
           topics: log.topics,
         })
-      )
+      ) as any
 
       _log('Decoded BetIns:', betIns)
-      _log('Decoded BetHashes:', betHashes)
+      _log('Decoded Updates:', updates)
+
+      betIns.sort((a: any, b: any) => (a.args.index as bigint) - (b.args.index as bigint))
+      updates.sort((a: any, b: any) => (a.args.index as bigint) - (b.args.index as bigint))
 
       const leaves: bigint[] = []
       let lastIndex: bigint = -1n
       let lastRand: bigint | undefined
       let lastHash: bigint | undefined
 
-      for (const log of betHashes) {
-        const {
-          index,
-          newRand: rand,
-          newHash: hash,
-        } = log.args as any as {
-          index: bigint
-          newRand: bigint
-          newHash: bigint
-        }
+      for (const bet of betIns) {
+        const index = bet.args.index as bigint
+        const hash = bet.args.newHash as bigint
 
-        const leaf = await mimcsponge2(hash, rand + index)
+        const update = updates.find(u => (u.args.index as bigint) >= index)
+        if (!update) continue
+
+        const rand = update.args.newRand as bigint
+        const leaf = await mimcsponge3(hash, rand, index)
+
         leaves.push(leaf)
-
         lastIndex = index
         lastRand = rand
         lastHash = hash
@@ -79,6 +80,7 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
         newRand: lastRand,
         newHash: lastHash,
         data: leaves,
+        betLogs: betIns
       }
     },
   })

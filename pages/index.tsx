@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import '@reown/appkit-wallet-button/react'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -13,6 +13,7 @@ import type { ICommitment } from '@/types/lottery'
 import { _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
+import { getRandIndex } from '@/lib/lottery/utils/getRandIndex'
 
 const schema = z.object({
   power: z
@@ -39,9 +40,7 @@ export default function Home() {
   const { playMutation, cancelBetMutation, commitMutation, revealMutation, collectRewardMutation } = useLotteryContract(
     { onStatus: handleStatus }
   )
-  const { data: leaves, isLoading: isLeavesLoading } = useLeaves({
-    fromBlock: 0n,
-  })
+  const { data: leaves, isLoading: isLeavesLoading } = useLeaves({})
   const power = form.watch('power')
 
   const handleMutateCommit = async () => {
@@ -71,7 +70,12 @@ export default function Home() {
     const committedHashes = lotteryHashes.slice(commitIndex)
     const padded = committedHashes.slice(0, 8).map(BigInt)
     const newHashes = [...padded, ...Array(8 - padded.length).fill(0n)]
-    _log('New hashes to be revealed:', newHashes.map(h => `0x${h.toString(16)}`), 'from commit index:', commitIndex)
+    _log(
+      'New hashes to be revealed:',
+      newHashes.map(h => `0x${h.toString(16)}`),
+      'from commit index:',
+      commitIndex
+    )
 
     await revealMutation.mutateAsync({
       oldRand,
