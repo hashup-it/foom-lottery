@@ -191,7 +191,7 @@ export default function Home() {
         <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
           <form onSubmit={form.handleSubmit(data => console.log(data))}>
             <div>
-              <label className="block text-xs text-tertiary italic !pb-1">ETH base multiplier to bet</label>
+              <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
               {form.formState.errors.power && (
                 <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
                   {form.formState.errors.power.message}
@@ -200,7 +200,7 @@ export default function Home() {
               <div className="flex items-center flex-nowrap gap-4">
                 <Input
                   type="number"
-                  placeholder="ETH power (integer)"
+                  placeholder="FOOM power (integer)"
                   {...form.register('power', { valueAsNumber: true })}
                 />
                 {power !== undefined && power !== null && !Number.isNaN(power) && (
@@ -249,6 +249,16 @@ export default function Home() {
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
           </Button>
+          <div className="mt-4">
+            <label className="block text-xs text-tertiary italic !pb-1">Deinvestment amount</label>
+            <div className="flex items-center flex-nowrap gap-4">
+              <Input
+                type="number"
+                placeholder="FOOM amount"
+                disabled={isLeavesLoading}
+              />
+            </div>
+          </div>
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed mb-4"
@@ -256,7 +266,6 @@ export default function Home() {
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
           </Button>
-
           <div className="mt-4">
             <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
             <div className="flex items-center flex-nowrap gap-4">
