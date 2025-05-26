@@ -215,7 +215,22 @@ export default function Home() {
             onClick={handleFormSubmit}
             disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
           >
+            {playMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
+          </Button>
+          <Button
+            variant="outline"
+            className="mt-2"
+            onClick={handleFormSubmit}
+            disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
+          >
             {playMutation.isPending ? <SpinnerText /> : 'Play'}
+          </Button>
+          <Button
+            variant="outline"
+            className="mt-2 disabled:!cursor-not-allowed"
+            onClick={() => {}}
+          >
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'Withdraw'}
           </Button>
           <Button
             variant="outline"
@@ -234,6 +249,14 @@ export default function Home() {
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
           </Button>
+          <Button
+            variant="outline"
+            className="mt-2 disabled:!cursor-not-allowed mb-4"
+            onClick={() => {}}
+          >
+            {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
+          </Button>
+
           <div className="mt-4">
             <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
             <div className="flex items-center flex-nowrap gap-4">
@@ -268,13 +291,6 @@ export default function Home() {
             }}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed mb-4"
-            onClick={() => {}}
-          >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'Restore leftover ETH (.payOut)'}
           </Button>
 
           <Button

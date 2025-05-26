@@ -63,7 +63,7 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
         const index = bet.args.index as bigint
         const hash = bet.args.newHash as bigint
 
-        const update = updates.find(u => (u.args.index as bigint) >= index)
+        const update = updates.find((u: any) => (u.args.index as bigint) >= index)
         if (!update) continue
 
         const rand = update.args.newRand as bigint
