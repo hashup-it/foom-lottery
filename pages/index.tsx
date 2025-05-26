@@ -185,7 +185,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen">
       <div className="flex h-[1em]" />
       <div className="w-full flex items-center justify-start flex-col gap-2">
-        <h1 className="text-2xl">FOOM Lottery</h1>
+        <h1 className="text-2xl font-black">FOOM Lottery</h1>
         <appkit-button />
 
         <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">

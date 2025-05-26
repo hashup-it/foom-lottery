@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { usePublicClient } from 'wagmi'
 import { parseAbiItem, decodeEventLog } from 'viem'
 import { mimcsponge3 } from '@/lib/lottery/utils/mimcsponge'
-import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { _log } from '@/lib/utils/ts'
+import { foundry } from 'viem/chains'
+import { ETH_LOTTERY } from '@/lib/utils/constants/addresses'
 
 const LOG_BET_IN_EVENT = parseAbiItem('event LogBetIn(uint256 index, uint256 newHash)')
 const LOG_UPDATE_EVENT = parseAbiItem('event LogUpdate(uint256 index, uint256 newRand, uint256 newRoot)')
@@ -19,13 +20,13 @@ export function useLeaves({ fromBlock = 0n }: { fromBlock?: bigint }) {
 
       const [rawBetIns, rawUpdates] = await Promise.all([
         publicClient.getLogs({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           event: LOG_BET_IN_EVENT,
           fromBlock,
           toBlock: 'latest',
         }),
         publicClient.getLogs({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           event: LOG_UPDATE_EVENT,
           fromBlock,
           toBlock: 'latest',

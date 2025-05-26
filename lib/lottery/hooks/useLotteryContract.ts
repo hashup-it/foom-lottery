@@ -3,7 +3,6 @@ import { usePublicClient, useWalletClient } from 'wagmi'
 import { parseEther, type Address, type TransactionReceipt, encodePacked, keccak256 } from 'viem'
 import { waitForTransactionReceipt } from 'viem/actions'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
-import { ETH_LOTTERY_ADDRESS } from '@/lib/utils/constants/evm'
 import { generateWithdraw } from '@/lib/lottery/withdraw'
 import { generateUpdate } from '@/lib/lottery/update'
 import { getHash } from '@/lib/lottery/getHash'
@@ -12,6 +11,8 @@ import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
 import { toast } from 'sonner'
 import { _error, _log } from '@/lib/utils/ts'
 import type { mask } from 'ethers'
+import { ETH_LOTTERY } from '@/lib/utils/constants/addresses'
+import { foundry } from 'viem/chains'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -57,7 +58,7 @@ export function useLotteryContract({
 
         const amount = 2 + 2 ** Number(power)
         const { request } = await publicClient.simulateContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'play',
           args: [clampedHash, BigInt(power)],
@@ -122,7 +123,7 @@ export function useLotteryContract({
         const refund = 0n
 
         const { request } = await publicClient.simulateContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'cancelbet',
           args: [index, pi_a, pi_b, pi_c, recipient, relayer, fee, refund],
@@ -189,7 +190,7 @@ export function useLotteryContract({
         const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
 
         const { request } = await publicClient.simulateContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'collect',
           args: [pi_a, pi_b, pi_c, root, nullifier, reward1, reward2, reward3, recipient, relayer, fee, refund],
@@ -218,7 +219,7 @@ export function useLotteryContract({
         const revealSecret = keccak256Uint(commitCount)
         const commitHash = keccak256Uint(BigInt(revealSecret))
         const { request } = await publicClient.simulateContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'commit',
           args: [commitHash],
@@ -228,7 +229,7 @@ export function useLotteryContract({
         const result = await waitForTransactionReceipt(publicClient, { hash: txHash })
 
         await walletClient.writeContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'rememberHash',
           account: walletClient.account.address,
@@ -277,7 +278,7 @@ export function useLotteryContract({
         const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
 
         const { request } = await publicClient.simulateContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'reveal',
           args: [revealSecret, pi_a, pi_b, pi_c, newRoot],
@@ -285,7 +286,7 @@ export function useLotteryContract({
         })
 
         await walletClient.writeContract({
-          address: ETH_LOTTERY_ADDRESS,
+          address: ETH_LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'rememberHash',
           account: walletClient.account.address,
