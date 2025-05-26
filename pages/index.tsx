@@ -88,7 +88,7 @@ export default function Home() {
   }
 
   const handleFormSubmit = form.handleSubmit(({ power }) => {
-    _log('Playing with:', 2 + 2 ** power, '* bet_min', ` = ${2 + 2 ** power}`)
+    _log('Playing with:', 2 + 2 ** power, '* bet_min', ` = ${2 + 2 ** power} FOOM`)
 
     playMutation.mutate(
       { power },
@@ -96,11 +96,11 @@ export default function Home() {
         onSuccess: result => {
           if (result && result.hash) {
             setCommitment({
-              secret: result.secretPower,
+              secret: BigInt(result.secretPower),
               power: BigInt(power ?? 0),
               rand: leaves?.newRand!,
               index: Number(leaves?.index),
-              hash: result.hash,
+              hash: BigInt(result.hash),
               leaves: leaves?.data!,
             })
           }
@@ -166,7 +166,7 @@ export default function Home() {
     }
   }, [])
 
-  /** Print user's last hash from the hashes state */
+  /** Print user's last hash from the hashes state; NOTE: This should be handled by backend only. */
   useEffect(() => {
     if (lotteryHashes.length) {
       const lastHash = lotteryHashes[lotteryHashes.length - 1]
@@ -174,6 +174,7 @@ export default function Home() {
     }
   }, [lotteryHashes.length])
 
+  /** NOTE: This should be handled by backend only */
   useEffect(() => {
     const stored = localStorage.getItem('commitIndex')
     if (stored) {
@@ -204,7 +205,7 @@ export default function Home() {
                   {...form.register('power', { valueAsNumber: true })}
                 />
                 {power !== undefined && power !== null && !Number.isNaN(power) && (
-                  <p className="">=&nbsp;{2 + 2 ** power}</p>
+                  <p className="">=&nbsp;{2 + 2 ** power}&nbsp;FOOM</p>
                 )}
               </div>
             </div>
@@ -224,13 +225,6 @@ export default function Home() {
             disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
           >
             {playMutation.isPending ? <SpinnerText /> : 'Play'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={() => {}}
-          >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'Withdraw'}
           </Button>
           <Button
             variant="outline"
@@ -317,6 +311,12 @@ export default function Home() {
           >
             {revealMutation.isPending ? <SpinnerText /> : '[Generator]: Reveal'}
           </Button>
+        </div>
+        <div className="w-full max-w-[835px] flex flex-col mb-2">
+          <p className="w-full break-all whitespace-pre-wrap italic font-bold">
+            List of Prayers to God:{'\n'}
+            1. May the lottery be a blessing to all who participate.{'\n'}
+          </p>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap italic font-bold">

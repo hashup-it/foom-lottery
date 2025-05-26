@@ -18,6 +18,6 @@
     }
   },
   "importsNotUsedAsValues": "error",
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "lib/lottery/utils/mimcMerkleTree.js"],
   "exclude": ["node_modules"]
 }
