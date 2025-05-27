@@ -1,2 +1,2 @@
-lib/lottery/circuit_artifacts/*.zkey !text !filter !merge !diff
-lib/lottery/circuit_artifacts/*.r1cs !text !filter !merge !diff
+lib/lottery/circuit_artifacts/*.zkey -text
+lib/lottery/circuit_artifacts/*.r1cs -text
