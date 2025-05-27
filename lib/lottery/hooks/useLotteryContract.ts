@@ -10,7 +10,6 @@ import { getLotteryStatus } from '@/lib/lottery/utils/getLotteryStatus'
 import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
 import { toast } from 'sonner'
 import { _error, _log } from '@/lib/utils/ts'
-import type { mask } from 'ethers'
 import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
 
