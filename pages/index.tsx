@@ -10,9 +10,15 @@ import { Input } from '@/components/ui/input'
 import { useLeaves } from '@/lib/lottery/hooks/useLeaves'
 import { useLotteryContract } from '@/lib/lottery/hooks/useLotteryContract'
 import type { ICommitment } from '@/types/lottery'
-import { _log } from '@/lib/utils/ts'
+import { _error, _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
+import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
+import { erc20Abi } from 'viem'
+import { useWalletClient, usePublicClient } from 'wagmi'
+import { FOOM } from '@/lib/utils/constants/addresses'
+import { isDevelopment } from '@/lib/utils/environment'
+import { base } from 'viem/chains'
 
 const schema = z.object({
   power: z
@@ -31,14 +37,14 @@ export default function Home() {
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
 
   const account = useAppKitAccount()
+  const { data: walletClient } = useWalletClient()
+  const publicClient = usePublicClient()
 
   const handleStatus = (data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`)
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   })
-  const { playMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract(
-    { onStatus: handleStatus }
-  )
+  const { playMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({ onStatus: handleStatus })
   const { data: leaves, isLoading: isLeavesLoading } = useLeaves({})
   const power = form.watch('power')
 
@@ -63,6 +69,62 @@ export default function Home() {
       }
     )
   })
+
+  async function swapUsdcToWeth({ amountIn }: { amountIn: bigint; slippage?: number }) {
+    try {
+      if (!walletClient || !account?.address || !publicClient) {
+        setStatus('Wallet not connected')
+        return
+      }
+
+      const allowance: bigint = await publicClient.readContract({
+        address: WETH_BASE,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [account.address as `0x${string}`, UNISWAP_V3_ROUTER],
+      })
+
+      if (allowance < amountIn) {
+        setStatus('Approving WETH...')
+
+        const approveTx = await walletClient.writeContract({
+          address: WETH_BASE,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [UNISWAP_V3_ROUTER, amountIn],
+          account: account.address as `0x${string}`,
+        })
+        await publicClient.waitForTransactionReceipt({ hash: approveTx })
+      } else {
+        setStatus('Sufficient WETH allowance, skipping approval.')
+      }
+
+      setStatus('Swapping WETH to FOOM...')
+      const params = {
+        tokenIn: WETH_BASE,
+        tokenOut: FOOM[base.id],
+        fee: 3000,
+        recipient: account.address as `0x${string}`,
+        amountIn,
+        amountOutMinimum: 0n,
+        sqrtPriceLimitX96: 0n,
+      }
+      const { request } = await publicClient.simulateContract({
+        address: UNISWAP_V3_ROUTER,
+        abi: UNISWAP_V3_ROUTER_ABI,
+        functionName: 'exactInputSingle',
+        args: [params],
+        value: 0n,
+        account: account.address as `0x${string}`,
+      })
+      const swapTx = await walletClient.writeContract(request)
+      await publicClient.waitForTransactionReceipt({ hash: swapTx })
+      setStatus('Swap complete!')
+    } catch (error) {
+      setStatus(`Swap failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      _error('Swap error:', error)
+    }
+  }
 
   useEffect(() => {
     const stored = localStorage.getItem('lotteryTickets')
@@ -252,6 +314,15 @@ export default function Home() {
             }}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
+          </Button>
+          <Button
+            variant="outline"
+            className="mt-2"
+            onClick={async () => {
+              await swapUsdcToWeth({ amountIn: 38_000_000_000_000_000n })
+            }}
+          >
+            Swap WETH→FOOM / ~$100
           </Button>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">

@@ -15,8 +15,8 @@ const projectId = WC_ID
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = isDevelopment()
   ? // ? [sepolia, baseSepolia, mainnet, base]
     // : [mainnet, base]
-    [foundry]
-  : [foundry]
+    [base]
+  : [base]
 
 const metadata: Metadata = {
   name: 'FOOM',
