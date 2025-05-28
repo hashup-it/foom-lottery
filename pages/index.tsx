@@ -13,7 +13,6 @@ import type { ICommitment } from '@/types/lottery'
 import { _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
-import { getRandIndex } from '@/lib/lottery/utils/getRandIndex'
 
 const schema = z.object({
   power: z
@@ -37,55 +36,11 @@ export default function Home() {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   })
-  const { playMutation, cancelBetMutation, commitMutation, revealMutation, collectRewardMutation } = useLotteryContract(
+  const { playMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract(
     { onStatus: handleStatus }
   )
   const { data: leaves, isLoading: isLeavesLoading } = useLeaves({})
   const power = form.watch('power')
-
-  const handleMutateCommit = async () => {
-    _log('Committing at hash length:', lotteryHashes.length)
-
-    await commitMutation.mutateAsync(undefined, {
-      onSuccess: receipt => {
-        if (!receipt) {
-          return
-        }
-
-        setCommitIndex(lotteryHashes.length)
-        localStorage.setItem('commitIndex', lotteryHashes.length.toString())
-      },
-    })
-  }
-
-  const handleMutateReveal = async () => {
-    if (leaves?.data === undefined || leaves?.newRand === undefined) {
-      return
-    }
-
-    const oldRand = BigInt(leaves.newRand)
-    const oldLeaves = leaves.data.map(BigInt)
-
-    // TODO: need to track the hashes committed since the last reveal **using the Indexer** – pad with 0n if there are less than 8, e.g. do:[hash1, hash2, hash3, 0n, 0n, 0n, 0n, 0n].
-    const committedHashes = lotteryHashes.slice(commitIndex)
-    const padded = committedHashes.slice(0, 8).map(BigInt)
-    const newHashes = [...padded, ...Array(8 - padded.length).fill(0n)]
-    _log(
-      'New hashes to be revealed:',
-      newHashes.map(h => `0x${h.toString(16)}`),
-      'from commit index:',
-      commitIndex
-    )
-
-    await revealMutation.mutateAsync({
-      oldRand,
-      oldLeaves,
-      newHashes,
-    })
-
-    setCommitIndex(0)
-    localStorage.setItem('commitIndex', '0')
-  }
 
   const handleFormSubmit = form.handleSubmit(({ power }) => {
     _log('Playing with:', 2 + 2 ** power, '* bet_min', ` = ${2 + 2 ** power} FOOM`)
@@ -201,6 +156,7 @@ export default function Home() {
               <div className="flex items-center flex-nowrap gap-4">
                 <Input
                   type="number"
+                  defaultValue={0}
                   placeholder="FOOM power (integer)"
                   {...form.register('power', { valueAsNumber: true })}
                 />
@@ -229,6 +185,7 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"
+            disabled
             onClick={() => {
               if (commitment && leaves) {
                 cancelBetMutation.mutate({
@@ -256,6 +213,7 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed mb-4"
+            disabled
             onClick={() => {}}
           >
             {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
@@ -275,7 +233,7 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"
-            disabled={isLeavesLoading || !redeemHex}
+            disabled={isLeavesLoading || !redeemHex || true}
             onClick={() => {
               _log('Having Leaves:', leaves, leaves?.newRand, leaves?.data)
 
@@ -294,22 +252,6 @@ export default function Home() {
             }}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={handleMutateCommit}
-          >
-            {commitMutation.isPending ? <SpinnerText /> : '[Generator]: Commit'}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={handleMutateReveal}
-          >
-            {revealMutation.isPending ? <SpinnerText /> : '[Generator]: Reveal'}
           </Button>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
