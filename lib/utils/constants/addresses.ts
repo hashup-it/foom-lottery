@@ -1,3 +1,4 @@
+import { isRemote } from '@/lib/utils/environment'
 import { zeroAddress, type Address } from 'viem'
 import { base, baseSepolia, type Chain, foundry, mainnet } from 'viem/chains'
 
@@ -13,4 +14,6 @@ const FOOM: { [key: Chain['id']]: Address } = {
   [base.id]: '0x02300aC24838570012027E0A90D3FEcCEF3c51d2',
 }
 
-export { LOTTERY, FOOM }
+const chain = isRemote() ? base : foundry
+
+export { LOTTERY, FOOM, chain }

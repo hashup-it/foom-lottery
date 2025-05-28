@@ -16,7 +16,7 @@ import type { Address } from 'viem'
 import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
 import { erc20Abi } from 'viem'
 import { useWalletClient, usePublicClient } from 'wagmi'
-import { FOOM } from '@/lib/utils/constants/addresses'
+import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { isDevelopment } from '@/lib/utils/environment'
 import { base } from 'viem/chains'
 
@@ -102,7 +102,7 @@ export default function Home() {
       setStatus('Swapping WETH to FOOM...')
       const params = {
         tokenIn: WETH_BASE,
-        tokenOut: FOOM[base.id],
+        tokenOut: FOOM[chain.id],
         fee: 3000,
         recipient: account.address as `0x${string}`,
         amountIn,
