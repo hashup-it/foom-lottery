@@ -10,7 +10,7 @@ const LOTTERY: { [key: Chain['id']]: Address } = {
 const FOOM: { [key: Chain['id']]: Address } = {
   [foundry.id]: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788',
   [baseSepolia.id]: zeroAddress /** TODO: */,
-  [base.id]: zeroAddress /** TODO: */,
+  [base.id]: '0x02300aC24838570012027E0A90D3FEcCEF3c51d2',
 }
 
 export { LOTTERY, FOOM }
