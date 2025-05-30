@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { usePublicClient } from 'wagmi'
 import { parseAbiItem, decodeEventLog } from 'viem'
-import { mimcsponge3 } from '@/lib/lottery/utils/mimcsponge'
+// import { mimcsponge3 } from '@/lib/lottery/utils/mimcsponge'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { _log } from '@/lib/utils/ts'
 import { foundry } from 'viem/chains'
@@ -68,7 +68,8 @@ export function useFrontendFetchedLeaves({ fromBlock = 0n }: { fromBlock?: bigin
         if (!update) continue
 
         const rand = update.args.newRand as bigint
-        const leaf = await mimcsponge3(hash, rand, index)
+        // TODO: Fix, mimic3sponge was here
+        const leaf = null as any
 
         leaves.push(leaf)
         lastIndex = index

@@ -1,6 +1,15 @@
 import { useMutation } from '@tanstack/react-query'
 import { usePublicClient, useWalletClient } from 'wagmi'
-import { parseEther, type Address, type TransactionReceipt, encodePacked, keccak256, erc20Abi } from 'viem'
+import {
+  parseEther,
+  type Address,
+  type TransactionReceipt,
+  encodePacked,
+  keccak256,
+  erc20Abi,
+  formatEther,
+  decodeEventLog,
+} from 'viem'
 import { waitForTransactionReceipt } from 'viem/actions'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 // import { generateWithdraw } from '@/lib/lottery/withdraw'
@@ -11,6 +20,7 @@ import { toast } from 'sonner'
 import { _error, _log } from '@/lib/utils/ts'
 import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
+import { BET_MIN } from '@/lib/lottery/constants'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -38,11 +48,17 @@ export function useLotteryContract({
   const publicClient = usePublicClient()
 
   const handleStatus = (data: string) => {
+    _log(data)
     onStatus?.(data)
   }
 
   const playMutation = useMutation({
     mutationFn: async ({ power, commitmentInput = 0 }: { power: number; commitmentInput?: number }) => {
+      const multiplier = 2n + 2n ** BigInt(power ?? 0)
+      const playAmount = BET_MIN * multiplier
+
+      _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} FOOM`)
+
       try {
         if (!walletClient || !publicClient) {
           throw new Error('Wallet not connected')
@@ -50,12 +66,8 @@ export function useLotteryContract({
 
         handleStatus('Generating commitment...')
         const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
-        const clampedHash = BigInt(commitment.hash) % 2n ** 256n
 
         handleStatus(`Commitment Hash: ${commitment.hash}`)
-
-        const multiplier = 2 + 2 ** Number(power)
-        const amount = BigInt(multiplier)
 
         const foomBalance = await publicClient.readContract({
           address: FOOM[foundry.id],
@@ -65,30 +77,62 @@ export function useLotteryContract({
         })
         handleStatus(`FOOM Balance: ${foomBalance}`)
 
-        let receipt
-
-        handleStatus(`Playing with FOOM tokens...`)
-
-        const { request: approveRequest } = await publicClient.simulateContract({
+        const currentAllowance = await publicClient.readContract({
           address: FOOM[foundry.id],
           abi: erc20Abi,
-          functionName: 'approve',
-          args: [LOTTERY[foundry.id], amount],
-          account: walletClient.account.address,
+          functionName: 'allowance',
+          args: [walletClient.account.address, LOTTERY[foundry.id]],
+        })
+        handleStatus(`Current FOOM Allowance: ${currentAllowance}, needed FOOM allowance: ${playAmount}`)
+
+        let receipt: any = undefined
+
+        handleStatus(`Playing with FOOM tokens...`)
+        if (currentAllowance < playAmount) {
+          const { request: approveRequest } = await publicClient.simulateContract({
+            address: FOOM[foundry.id],
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [LOTTERY[foundry.id], playAmount],
+            account: walletClient.account.address,
+          })
+
+          const approveTx = await walletClient.writeContract(approveRequest)
+          await waitForTransactionReceipt(publicClient, { hash: approveTx })
+
+          let updatedAllowance = await publicClient.readContract({
+            address: FOOM[foundry.id],
+            abi: erc20Abi,
+            functionName: 'allowance',
+            args: [walletClient.account.address, LOTTERY[foundry.id]],
+          })
+
+          handleStatus(`Updated FOOM Allowance: ${updatedAllowance}`)
+
+          if (updatedAllowance < playAmount) {
+            throw new Error('Updated allowance still insufficient.')
+          }
+        } else {
+          handleStatus('Sufficient allowance, skipping approval.')
+        }
+
+        // _log('current nonce:', await publicClient.getTransactionCount({ address: walletClient.account.address }))
+        const correctNonce = await publicClient.getTransactionCount({
+          address: walletClient.account.address,
         })
 
-        const approveTx = await walletClient.writeContract(approveRequest)
-        await waitForTransactionReceipt(publicClient, { hash: approveTx })
-
-        handleStatus(`FOOM approval tx: ${approveTx}`)
+        _log('Nonce:', correctNonce)
 
         const { request: playRequest } = await publicClient.simulateContract({
           address: LOTTERY[foundry.id],
           abi: EthLotteryAbi,
           functionName: 'play',
-          args: [clampedHash, BigInt(power)],
+          args: [commitment.hash, BigInt(power)],
           account: walletClient.account.address,
+          nonce: correctNonce,
         })
+
+        _log('past simulation, request:', playRequest)
 
         const playTx = await walletClient.writeContract(playRequest)
         receipt = await waitForTransactionReceipt(publicClient, {
@@ -98,15 +142,52 @@ export function useLotteryContract({
         const secret = BigInt(commitment.secret_power) >> 8n
         handleStatus(`Ticket: ${commitment.secret_power}, Next Index: ${commitment.nextIndex}, Amount: ${multiplier}`)
 
-        return { receipt, secretPower: commitment.secret_power, secret, hash: commitment.hash, startIndex: commitment.nextIndex }
+        return {
+          receipt,
+          secretPower: commitment.secret_power,
+          secret,
+          hash: commitment.hash,
+          startIndex: commitment.nextIndex,
+        }
       } catch (error: any) {
         _error(error)
         toast(error?.cause?.reason || error?.message || `${error}`)
         handleStatus(`Error: ${error.message}`)
       }
     },
-    onSuccess: receipt => {
-      if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
+    onSuccess: (data: any) => {
+      if (data) {
+        const { receipt, ...output } = data
+
+        handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
+        handleStatus(`Result: ${JSON.stringify(output, null, 2)}`)
+
+        const logs = receipt.logs.map(log => {
+          return {
+            address: log.address,
+            data: log.data,
+            topics: log.topics,
+          }
+        })
+        _log('Raw TX logs:', logs)
+
+        const decodedLogs = logs
+          .map(log => {
+            try {
+              return decodeEventLog({
+                abi: [...EthLotteryAbi, ...erc20Abi],
+                data: log.data,
+                topics: log.topics,
+              })
+            } catch (err) {
+              return null
+            }
+          })
+          .filter(log => log !== null)
+        _log('Decoded Logs:', decodedLogs)
+
+        handleStatus(`Logs: ${JSON.stringify(decodedLogs, null, 2)}`)
+      }
     },
   })
 
@@ -124,7 +205,6 @@ export function useLotteryContract({
     }) => {
       // try {
       //   if (!walletClient || !publicClient) throw new Error('Wallet/client missing')
-
       //   const {
       //     proof,
       //     publicSignals: { root, nullifier, reward1, reward2, reward3 },
@@ -138,13 +218,11 @@ export function useLotteryContract({
       //     refund: 0n,
       //     leaves,
       //   })
-
       //   const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
       //   const recipient = walletClient.account.address as Address
       //   const relayer = walletClient.account.address as Address
       //   const fee = 0n
       //   const refund = 0n
-
       //   const { request } = await publicClient.simulateContract({
       //     address: LOTTERY[foundry.id],
       //     abi: EthLotteryAbi,
@@ -153,7 +231,6 @@ export function useLotteryContract({
       //     value: refund,
       //     account: walletClient.account.address,
       //   })
-
       //   const txHash = await walletClient.writeContract(request)
       //   return await waitForTransactionReceipt(publicClient, { hash: txHash })
       // } catch (error: any) {
@@ -189,7 +266,6 @@ export function useLotteryContract({
     }) => {
       // try {
       //   if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-
       //   const withdrawOutput = await generateWithdraw({
       //     secret,
       //     power,
@@ -200,18 +276,14 @@ export function useLotteryContract({
       //     refund,
       //     leaves,
       //   })
-
       //   if (typeof withdrawOutput !== 'object' || !withdrawOutput.proof || !withdrawOutput.publicSignals) {
       //     throw new Error('Invalid withdraw proof format')
       //   }
-
       //   const {
       //     proof,
       //     publicSignals: { root, nullifier, reward1, reward2, reward3 },
       //   } = withdrawOutput
-
       //   const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
-
       //   const { request } = await publicClient.simulateContract({
       //     address: LOTTERY[foundry.id],
       //     abi: EthLotteryAbi,
@@ -220,7 +292,6 @@ export function useLotteryContract({
       //     value: refund,
       //     account: walletClient.account.address,
       //   })
-
       //   const txHash = await walletClient.writeContract(request)
       //   return await waitForTransactionReceipt(publicClient, { hash: txHash })
       // } catch (error: any) {

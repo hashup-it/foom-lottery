@@ -14,11 +14,13 @@ import { _error, _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
 import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
-import { erc20Abi } from 'viem'
+import { erc20Abi, formatEther } from 'viem'
 import { useWalletClient, usePublicClient } from 'wagmi'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { isDevelopment } from '@/lib/utils/environment'
 import { base } from 'viem/chains'
+import { BET_MIN } from '@/lib/lottery/constants'
+import { nFormatter } from '@/lib/utils/node'
 
 const schema = z.object({
   power: z
@@ -49,8 +51,6 @@ export default function Home() {
   const power = form.watch('power')
 
   const handleFormSubmit = form.handleSubmit(({ power }) => {
-    _log('Playing with:', 2 + 2 ** power, '* bet_min', ` = ${2 + 2 ** power} FOOM`)
-
     playMutation.mutate(
       { power },
       {
@@ -223,7 +223,9 @@ export default function Home() {
                   {...form.register('power', { valueAsNumber: true })}
                 />
                 {power !== undefined && power !== null && !Number.isNaN(power) && (
-                  <p className="">=&nbsp;{2 + 2 ** power}&nbsp;FOOM</p>
+                  <p className="">
+                    =&nbsp;{nFormatter(formatEther(BET_MIN * (2n + 2n ** BigInt(power || 0))))}&nbsp;FOOM
+                  </p>
                 )}
               </div>
             </div>
