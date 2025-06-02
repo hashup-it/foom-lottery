@@ -14,7 +14,7 @@ import { _error, _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
 import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
-import { erc20Abi, formatEther } from 'viem'
+import { erc20Abi, formatEther, parseEther, parseUnits } from 'viem'
 import { useWalletClient, usePublicClient } from 'wagmi'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { isDevelopment } from '@/lib/utils/environment'
@@ -22,12 +22,19 @@ import { base } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { nFormatter } from '@/lib/utils/node'
 
-const schema = z.object({
+const playSchema = z.object({
   power: z
     .number()
     .int({ message: 'Value must be an integer' })
     .min(0, { message: 'Value must be at least 0' })
     .max(31, { message: 'Value must be at most 31' }),
+})
+
+const playAndPraySchema = z.object({
+  prayerText: z.string().min(1, { message: 'You need to enter your prayer' }),
+  prayerEth: z
+    .number({ invalid_type_error: 'Please enter amount of ETH to pray with' })
+    .min(0, { message: 'Prayer ETH amount must be at least 0' }),
 })
 
 export default function Home() {
@@ -43,14 +50,21 @@ export default function Home() {
   const publicClient = usePublicClient()
 
   const handleStatus = (data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`)
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const playForm = useForm<z.infer<typeof playSchema>>({
+    resolver: zodResolver(playSchema),
   })
-  const { playMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({ onStatus: handleStatus })
+  const playAndPrayForm = useForm<z.infer<typeof playAndPraySchema>>({
+    resolver: zodResolver(playAndPraySchema),
+  })
+  const { playMutation, playAndPrayMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({
+    onStatus: handleStatus,
+  })
   const { data: leaves, isLoading: isLeavesLoading } = useLeaves({})
-  const power = form.watch('power')
+  const power = playForm.watch('power')
+  const playAndPrayPrayerText = playAndPrayForm.watch('prayerText')
+  const playAndPrayEth = playAndPrayForm.watch('prayerEth')
 
-  const handleFormSubmit = form.handleSubmit(({ power }) => {
+  const handlePlayFormSubmit = playForm.handleSubmit(({ power }) => {
     playMutation.mutate(
       { power },
       {
@@ -59,6 +73,8 @@ export default function Home() {
             setCommitment({
               secret: BigInt(result.secretPower),
               power: BigInt(power ?? 0),
+
+              // TODO: Remove, leftover from previous versions
               rand: leaves?.newRand!,
               index: Number(leaves?.index),
               hash: BigInt(result.hash),
@@ -68,6 +84,16 @@ export default function Home() {
         },
       }
     )
+  })
+
+  const handlePlayPrayFormSubmit = playAndPrayForm.handleSubmit(({ prayerEth, prayerText }) => {
+    _log('submitting a pray:', prayerEth, prayerText, power)
+
+    playAndPrayMutation.mutate({
+      power,
+      prayValue: parseEther(prayerEth?.toString() || '0'),
+      prayText: prayerText,
+    })
   })
 
   async function swapUsdcToWeth({ amountIn }: { amountIn: bigint; slippage?: number }) {
@@ -207,12 +233,12 @@ export default function Home() {
         <appkit-button />
 
         <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
-          <form onSubmit={form.handleSubmit(data => console.log(data))}>
+          <form onSubmit={playForm.handleSubmit(data => console.log(data))}>
             <div>
               <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
-              {form.formState.errors.power && (
+              {playForm.formState.errors.power && (
                 <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
-                  {form.formState.errors.power.message}
+                  {playForm.formState.errors.power.message}
                 </p>
               )}
               <div className="flex items-center flex-nowrap gap-4">
@@ -220,7 +246,7 @@ export default function Home() {
                   type="number"
                   defaultValue={0}
                   placeholder="FOOM power (integer)"
-                  {...form.register('power', { valueAsNumber: true })}
+                  {...playForm.register('power', { valueAsNumber: true })}
                 />
                 {power !== undefined && power !== null && !Number.isNaN(power) && (
                   <p className="">
@@ -233,19 +259,62 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2"
-            onClick={handleFormSubmit}
-            disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
-          >
-            {playMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={handleFormSubmit}
+            onClick={handlePlayFormSubmit}
             disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
           >
             {playMutation.isPending ? <SpinnerText /> : 'Play'}
           </Button>
+
+          <form
+            onSubmit={playAndPrayForm.handleSubmit(data => console.log(data))}
+            className="flex gap-2 flex-col"
+          >
+            <div>
+              <label className="block text-xs text-tertiary italic !pb-1 mt-2">Prayer text</label>
+              {playAndPrayForm.formState.errors.prayerText && (
+                <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+                  {playAndPrayForm.formState.errors.prayerText.message}
+                </p>
+              )}
+              <div className="flex items-center flex-nowrap gap-4">
+                <Input
+                  type="text"
+                  placeholder="Pray to the Terrestrial God"
+                  {...playAndPrayForm.register('prayerText')}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-tertiary italic !pb-1">ETH prayed</label>
+              {playAndPrayForm.formState.errors.prayerEth && (
+                <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+                  {playAndPrayForm.formState.errors.prayerEth.message}
+                </p>
+              )}
+              <div className="flex items-center flex-nowrap gap-4">
+                <Input
+                  type="number"
+                  placeholder="ETH amount"
+                  {...playAndPrayForm.register('prayerEth', { valueAsNumber: true })}
+                />
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={handlePlayPrayFormSubmit}
+              disabled={
+                power === undefined ||
+                power === null /** || !playAndPrayEth || !playAndPrayPrayerText */ ||
+                Number.isNaN(power) ||
+                playAndPrayMutation.isPending ||
+                playMutation.isPending
+              }
+            >
+              {playAndPrayMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
+            </Button>
+          </form>
+
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"

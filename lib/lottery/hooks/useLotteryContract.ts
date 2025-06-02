@@ -21,6 +21,7 @@ import { _error, _log } from '@/lib/utils/ts'
 import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
+import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -52,103 +53,116 @@ export function useLotteryContract({
     onStatus?.(data)
   }
 
+  async function prepareAndPlay({
+    power,
+    commitmentInput = 0,
+    onStatus,
+    customArgs = {},
+  }: {
+    power: number
+    commitmentInput?: number
+    onStatus?: (msg: string) => void
+    customArgs?: Record<string, any>
+  }) {
+    const multiplier = 2n + 2n ** BigInt(power ?? 0)
+    const playAmount = BET_MIN * multiplier
+
+    _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} FOOM`)
+
+    if (!walletClient || !publicClient) {
+      throw new Error('Wallet not connected')
+    }
+
+    const status = (msg: string) => {
+      _log(msg)
+      onStatus?.(msg)
+    }
+
+    status('Generating commitment...')
+    const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
+    status(`Commitment Hash: ${commitment.hash}`)
+
+    const foomBalance = await publicClient.readContract({
+      address: FOOM[foundry.id],
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [walletClient.account.address],
+    })
+    status(`FOOM Balance: ${foomBalance}`)
+
+    const currentAllowance = await publicClient.readContract({
+      address: FOOM[foundry.id],
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args: [walletClient.account.address, LOTTERY[foundry.id]],
+    })
+    status(`Current FOOM Allowance: ${currentAllowance}, needed FOOM allowance: ${playAmount}`)
+
+    let receipt: any = undefined
+
+    status(`Playing with FOOM tokens...`)
+    if (currentAllowance < playAmount) {
+      const { request: approveRequest } = await publicClient.simulateContract({
+        address: FOOM[foundry.id],
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [LOTTERY[foundry.id], playAmount],
+        account: walletClient.account.address,
+      })
+      const approveTx = await walletClient.writeContract(approveRequest)
+      await waitForTransactionReceipt(publicClient, { hash: approveTx })
+      let updatedAllowance = await publicClient.readContract({
+        address: FOOM[foundry.id],
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [walletClient.account.address, LOTTERY[foundry.id]],
+      })
+      status(`Updated FOOM Allowance: ${updatedAllowance}`)
+      if (updatedAllowance < playAmount) {
+        throw new Error('Updated allowance still insufficient.')
+      }
+    } else {
+      status('Sufficient allowance, skipping approval.')
+    }
+
+    const correctNonce = await publicClient.getTransactionCount({
+      address: walletClient.account.address,
+    })
+    _log('Nonce:', correctNonce)
+
+    const { request: playRequest } = await publicClient.simulateContract({
+      address: LOTTERY[foundry.id],
+      abi: EthLotteryAbi,
+      functionName: customArgs.functionName || 'play',
+      args: customArgs.args || [commitment.hash, BigInt(power)],
+      account: walletClient.account.address,
+      nonce: correctNonce,
+    })
+    _log('past simulation, request:', playRequest)
+
+    const playTx = await walletClient.writeContract(playRequest)
+    receipt = await waitForTransactionReceipt(publicClient, { hash: playTx })
+
+    const secret = BigInt(commitment.secret_power) >> 8n
+    const lastLeaf = await fetchLastLeaf()
+    status(
+      `Ticket: ${commitment.secret_power}, Next Index: ${lastLeaf[0]}, block number: ${lastLeaf[1]}, Amount: ${multiplier}`
+    )
+
+    return {
+      receipt,
+      secretPower: commitment.secret_power,
+      secret,
+      hash: commitment.hash,
+      startIndex: lastLeaf[0],
+      startBlock: lastLeaf[1],
+    }
+  }
+
   const playMutation = useMutation({
     mutationFn: async ({ power, commitmentInput = 0 }: { power: number; commitmentInput?: number }) => {
-      const multiplier = 2n + 2n ** BigInt(power ?? 0)
-      const playAmount = BET_MIN * multiplier
-
-      _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} FOOM`)
-
       try {
-        if (!walletClient || !publicClient) {
-          throw new Error('Wallet not connected')
-        }
-
-        handleStatus('Generating commitment...')
-        const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
-
-        handleStatus(`Commitment Hash: ${commitment.hash}`)
-
-        const foomBalance = await publicClient.readContract({
-          address: FOOM[foundry.id],
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [walletClient.account.address],
-        })
-        handleStatus(`FOOM Balance: ${foomBalance}`)
-
-        const currentAllowance = await publicClient.readContract({
-          address: FOOM[foundry.id],
-          abi: erc20Abi,
-          functionName: 'allowance',
-          args: [walletClient.account.address, LOTTERY[foundry.id]],
-        })
-        handleStatus(`Current FOOM Allowance: ${currentAllowance}, needed FOOM allowance: ${playAmount}`)
-
-        let receipt: any = undefined
-
-        handleStatus(`Playing with FOOM tokens...`)
-        if (currentAllowance < playAmount) {
-          const { request: approveRequest } = await publicClient.simulateContract({
-            address: FOOM[foundry.id],
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [LOTTERY[foundry.id], playAmount],
-            account: walletClient.account.address,
-          })
-
-          const approveTx = await walletClient.writeContract(approveRequest)
-          await waitForTransactionReceipt(publicClient, { hash: approveTx })
-
-          let updatedAllowance = await publicClient.readContract({
-            address: FOOM[foundry.id],
-            abi: erc20Abi,
-            functionName: 'allowance',
-            args: [walletClient.account.address, LOTTERY[foundry.id]],
-          })
-
-          handleStatus(`Updated FOOM Allowance: ${updatedAllowance}`)
-
-          if (updatedAllowance < playAmount) {
-            throw new Error('Updated allowance still insufficient.')
-          }
-        } else {
-          handleStatus('Sufficient allowance, skipping approval.')
-        }
-
-        // _log('current nonce:', await publicClient.getTransactionCount({ address: walletClient.account.address }))
-        const correctNonce = await publicClient.getTransactionCount({
-          address: walletClient.account.address,
-        })
-
-        _log('Nonce:', correctNonce)
-
-        const { request: playRequest } = await publicClient.simulateContract({
-          address: LOTTERY[foundry.id],
-          abi: EthLotteryAbi,
-          functionName: 'play',
-          args: [commitment.hash, BigInt(power)],
-          account: walletClient.account.address,
-          nonce: correctNonce,
-        })
-
-        _log('past simulation, request:', playRequest)
-
-        const playTx = await walletClient.writeContract(playRequest)
-        receipt = await waitForTransactionReceipt(publicClient, {
-          hash: playTx,
-        })
-
-        const secret = BigInt(commitment.secret_power) >> 8n
-        handleStatus(`Ticket: ${commitment.secret_power}, Next Index: ${commitment.nextIndex}, Amount: ${multiplier}`)
-
-        return {
-          receipt,
-          secretPower: commitment.secret_power,
-          secret,
-          hash: commitment.hash,
-          startIndex: commitment.nextIndex,
-        }
+        return await prepareAndPlay({ power, commitmentInput, onStatus })
       } catch (error: any) {
         _error(error)
         toast(error?.cause?.reason || error?.message || `${error}`)
@@ -158,19 +172,10 @@ export function useLotteryContract({
     onSuccess: (data: any) => {
       if (data) {
         const { receipt, ...output } = data
-
         handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
         handleStatus(`Result: ${JSON.stringify(output, null, 2)}`)
-
-        const logs = receipt.logs.map(log => {
-          return {
-            address: log.address,
-            data: log.data,
-            topics: log.topics,
-          }
-        })
+        const logs = receipt.logs.map(log => ({ address: log.address, data: log.data, topics: log.topics }))
         _log('Raw TX logs:', logs)
-
         const decodedLogs = logs
           .map(log => {
             try {
@@ -185,7 +190,60 @@ export function useLotteryContract({
           })
           .filter(log => log !== null)
         _log('Decoded Logs:', decodedLogs)
+        handleStatus(`Logs: ${JSON.stringify(decodedLogs, null, 2)}`)
+      }
+    },
+  })
 
+  const playAndPrayMutation = useMutation({
+    mutationFn: async ({
+      power,
+      prayValue,
+      prayText,
+      commitmentInput = 0,
+    }: {
+      power: number
+      prayValue: bigint
+      prayText: string
+      commitmentInput?: number
+    }) => {
+      try {
+        return await prepareAndPlay({
+          power,
+          commitmentInput,
+          onStatus,
+          customArgs: {
+            functionName: 'playAndPray',
+            args: [`0x${Number(power).toString(16)}`, BigInt(prayValue), prayText],
+          },
+        })
+      } catch (error: any) {
+        _error(error)
+        toast(error?.cause?.reason || error?.message || `${error}`)
+        handleStatus(`Error: ${error.message}`)
+      }
+    },
+    onSuccess: (data: any) => {
+      if (data) {
+        const { receipt, ...output } = data
+        handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
+        handleStatus(`Result: ${JSON.stringify(output, null, 2)}`)
+        const logs = receipt.logs.map(log => ({ address: log.address, data: log.data, topics: log.topics }))
+        _log('Raw TX logs:', logs)
+        const decodedLogs = logs
+          .map(log => {
+            try {
+              return decodeEventLog({
+                abi: [...EthLotteryAbi, ...erc20Abi],
+                data: log.data,
+                topics: log.topics,
+              })
+            } catch (err) {
+              return null
+            }
+          })
+          .filter(log => log !== null)
+        _log('Decoded Logs:', decodedLogs)
         handleStatus(`Logs: ${JSON.stringify(decodedLogs, null, 2)}`)
       }
     },
@@ -307,6 +365,7 @@ export function useLotteryContract({
 
   return {
     playMutation,
+    playAndPrayMutation,
     cancelBetMutation,
     collectRewardMutation,
     formatProofForContract,

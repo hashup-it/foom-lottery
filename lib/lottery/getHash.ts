@@ -1,10 +1,7 @@
 import { pedersenHash } from './utils/pedersen'
 import { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } from './utils/bigint'
-import { readLast } from './utils/mimcMerkleTree'
 
 export async function getHash(inputs: (string | number | any)[]) {
-  const [nextIndex, blockNumber, lastRoot, lastLeaf] = await readLast()
-
   let power = hexToBigint(inputs[0])
   let hash = 0n
   let secret = 0n
@@ -34,11 +31,10 @@ export async function getHash(inputs: (string | number | any)[]) {
   //   [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(nextIndex),bigintToHex(blockNumber)]
   // );
   // return res;
+
   return {
     secret_power: bigintToHex(secret_power),
     hash: bigintToHex(hash),
-    nextIndex: bigintToHex(BigInt(nextIndex)),
-    blockNumber: bigintToHex(BigInt(blockNumber)),
   }
 }
 

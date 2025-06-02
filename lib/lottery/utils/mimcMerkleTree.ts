@@ -34,18 +34,18 @@ async function getLines(path: string) {
   }
 }
 
-async function readLast() {
-  // Read from the Dexie database instead
+// async function readLast() {
+  // Read from the Dexie database instead / fetch from API directly for newest data and cache later
   // const db = new Dexie('lottery')
   // const lastRecord = await db.table('last').get(1)
   // if (lastRecord) {
   //   return [lastRecord.nextIndex, lastRecord.blockNumber, hexToBigint(lastRecord.lastRoot), hexToBigint(lastRecord.lastLeaf)]
   // }
 
-  const lines = await getLines('www/last.csv')
-  const [nextIndex, blockNumber, lastRoot, lastLeaf] = lines[0].split(',')
-  return [parseInt(nextIndex, 16), parseInt(blockNumber, 16), hexToBigint(lastRoot), hexToBigint(lastLeaf)]
-}
+//   const lines = await getLines('www/last.csv')
+//   const [nextIndex, blockNumber, lastRoot, lastLeaf] = lines[0].split(',')
+//   return [parseInt(nextIndex, 16), parseInt(blockNumber, 16), hexToBigint(lastRoot), hexToBigint(lastLeaf)]
+// }
 
 // async function getIndexRand(hashstr: string, betIndex: number) {
 //   const path = sprintfjs.sprintf('%06x', betIndex >> 8)
