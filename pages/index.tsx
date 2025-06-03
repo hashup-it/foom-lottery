@@ -17,8 +17,6 @@ import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '
 import { erc20Abi, formatEther, parseEther, parseUnits } from 'viem'
 import { useWalletClient, usePublicClient } from 'wagmi'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
-import { isDevelopment } from '@/lib/utils/environment'
-import { base } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { nFormatter } from '@/lib/utils/node'
 
