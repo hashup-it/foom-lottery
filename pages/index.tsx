@@ -7,7 +7,6 @@ import { z } from 'zod'
 import SpinnerText from '@/components/shared/spinner-text'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useLeaves } from '@/lib/lottery/hooks/useLeaves'
 import { useLotteryContract } from '@/lib/lottery/hooks/useLotteryContract'
 import type { ICommitment } from '@/types/lottery'
 import { _error, _log } from '@/lib/utils/ts'
@@ -19,6 +18,9 @@ import { useWalletClient, usePublicClient } from 'wagmi'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { nFormatter } from '@/lib/utils/node'
+import indexer from '@/lib/indexer'
+import { pedersenHash } from '@/lib/lottery/utils/pedersen'
+import { leBigintToBuffer } from '@/lib/lottery/utils/bigint'
 
 const playSchema = z.object({
   power: z
@@ -39,7 +41,9 @@ export default function Home() {
   const [status, setStatus] = useState('')
   const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets, setTickets] = useState<string[]>([])
-  const [redeemHex, setRedeemHex] = useState<string>('0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700')
+  const [redeemHex, setRedeemHex] = useState<string>(
+    '0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700'
+  )
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
 
@@ -57,7 +61,6 @@ export default function Home() {
   const { playMutation, playAndPrayMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({
     onStatus: handleStatus,
   })
-  const { data: leaves, isLoading: isLeavesLoading } = useLeaves({})
   const power = playForm.watch('power')
   const playAndPrayPrayerText = playAndPrayForm.watch('prayerText')
   const playAndPrayEth = playAndPrayForm.watch('prayerEth')
@@ -71,12 +74,10 @@ export default function Home() {
             setCommitment({
               secret: BigInt(result.secretPower),
               power: BigInt(power ?? 0),
-
-              // TODO: Remove, leftover from previous versions
-              rand: leaves?.newRand!,
-              index: Number(leaves?.index),
               hash: BigInt(result.hash),
-              leaves: leaves?.data!,
+              rand: 0n,
+              index: 0,
+              leaves: [],
             })
           }
         },
@@ -150,24 +151,39 @@ export default function Home() {
     }
   }
 
-  const
-  handleRedeem = async () => {
+  const handleRedeem = async () => {
     if (!redeemHex) {
       return
     }
 
-    _log('Redeeming ticket:', redeemHex)
+    try {
+      /** @dev derive the ticket's hash using pedersenHash */
+      const ticketSecret = BigInt(redeemHex)
 
-    collectRewardMutation.mutate({
-  secret: BigInt(redeemHex),
-  power: BigInt(redeemHex) & 0xffn,
-  rand: BigInt(leaves.newRand),
-  recipient: account.address as Address,
-  relayer: RELAYER_ADDRESS, // change this to your backend relayer's address
-  fee: 0n,
-  refund: 0n,
-  leaves: leaves.data,
-})
+      /** @dev recover secret and power */
+      const power = ticketSecret & 0xffn
+      const secret = ticketSecret >> 8n
+
+      /** @dev recompute hash */
+      const ticketHash = await pedersenHash(leBigintToBuffer(secret, 31))
+
+      const { data: startIndex } = await indexer.get('/start-index', {
+        params: {
+          hash: `${ticketHash}`,
+        },
+      })
+
+      collectRewardMutation.mutate({
+        secretPower: ticketSecret,
+        startIndex: startIndex || 0,
+        recipient: account.address as Address,
+        relayer: '0x0',
+        fee: 0n,
+        refund: 0n,
+      })
+    } catch (error) {
+      _error('Failed to fetch startIndex:', error)
+    }
   }
 
   useEffect(() => {
@@ -338,13 +354,8 @@ export default function Home() {
             className="mt-2 disabled:!cursor-not-allowed"
             disabled
             onClick={() => {
-              if (commitment && leaves) {
-                cancelBetMutation.mutate({
-                  secret: commitment.secret,
-                  power: commitment.power,
-                  index: commitment.index || Number(leaves.index),
-                  leaves: leaves.data,
-                })
+              if (commitment) {
+                cancelBetMutation.mutate(commitment)
                 setCommitment(undefined)
               }
             }}
@@ -357,7 +368,7 @@ export default function Home() {
               <Input
                 type="number"
                 placeholder="FOOM amount"
-                disabled={isLeavesLoading}
+                disabled={false}
               />
             </div>
           </div>
@@ -378,14 +389,14 @@ export default function Home() {
                 value={redeemHex}
                 defaultValue="0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700"
                 onChange={e => setRedeemHex(e.target.value)}
-                disabled={isLeavesLoading}
+                disabled={false}
               />
             </div>
           </div>
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"
-            disabled={isLeavesLoading || !redeemHex}
+            disabled={!redeemHex}
             onClick={handleRedeem}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}

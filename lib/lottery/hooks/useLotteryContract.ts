@@ -21,7 +21,6 @@ import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
-import relayerApi from '@/lib/relayer'
 import { generateWithdraw } from '../withdraw'
 import axios from 'axios'
 
@@ -260,13 +259,13 @@ export function useLotteryContract({
     mutationFn: async ({
       secret,
       power,
-      index,
-      leaves,
+      index = 0,
+      leaves = [],
     }: {
       secret: bigint
       power: bigint
-      index: number
-      leaves: bigint[]
+      index?: number
+      leaves?: bigint[]
     }) => {
       // try {
       //   if (!walletClient || !publicClient) throw new Error('Wallet/client missing')
