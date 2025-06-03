@@ -87,7 +87,7 @@ export default function Home() {
   })
 
   const handlePlayPrayFormSubmit = playAndPrayForm.handleSubmit(({ prayerEth, prayerText }) => {
-    _log('submitting a pray:', prayerEth, prayerText, power)
+    _log('submitting a pray:', prayerText, 'for ETH:', prayerEth, 'with power:', power)
 
     playAndPrayMutation.mutate({
       power,
@@ -150,6 +150,23 @@ export default function Home() {
       setStatus(`Swap failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       _error('Swap error:', error)
     }
+  }
+
+  const handleRedeem = async () => {
+    if (!redeemHex) {
+      return
+    }
+
+    collectRewardMutation.mutate({
+      secret: BigInt(redeemHex),
+      power: BigInt(redeemHex) & 0xffn,
+      rand: BigInt(leaves.newRand),
+      recipient: account.address as Address,
+      relayer: account.address as Address,
+      fee: 0n,
+      refund: 0n,
+      leaves: leaves.data,
+    })
   }
 
   useEffect(() => {
@@ -367,22 +384,7 @@ export default function Home() {
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"
             disabled={isLeavesLoading || !redeemHex || true}
-            onClick={() => {
-              _log('Having Leaves:', leaves, leaves?.newRand, leaves?.data)
-
-              if (leaves && leaves.newRand && leaves.data) {
-                collectRewardMutation.mutate({
-                  secret: BigInt(redeemHex),
-                  power: BigInt(redeemHex) & 0xffn,
-                  rand: BigInt(leaves.newRand),
-                  recipient: account.address as Address,
-                  relayer: account.address as Address,
-                  fee: 0n,
-                  refund: 0n,
-                  leaves: leaves.data,
-                })
-              }
-            }}
+            onClick={handleRedeem}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
           </Button>

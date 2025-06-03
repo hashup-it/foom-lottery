@@ -9,9 +9,5 @@ export const fetchLastLeaf = async (): Promise<
     throw new Error(`Failed to fetch last leaf: ${response.statusText}`)
   }
 
-  const { data } = response.data
-  if (typeof data !== 'object') {
-    throw new Error('Invalid response format: expected an array')
-  }
-  return data
+  return response.data
 }

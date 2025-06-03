@@ -134,13 +134,17 @@ export function useLotteryContract({
       address: LOTTERY[foundry.id],
       abi: EthLotteryAbi,
       functionName: customArgs.functionName || 'play',
-      args: customArgs.args || [commitment.hash, BigInt(power)],
+      args: [commitment.hash, BigInt(power), ...(customArgs.args ?? [])],
       account: walletClient.account.address,
       nonce: correctNonce,
+      ...(customArgs.value !== undefined ? { value: customArgs.value } : {}),
     })
     _log('past simulation, request:', playRequest)
 
-    const playTx = await walletClient.writeContract(playRequest)
+    const playTx = await walletClient.writeContract({
+      ...playRequest,
+      ...(customArgs.value !== undefined ? { value: customArgs.value } : {}),
+    })
     receipt = await waitForTransactionReceipt(publicClient, { hash: playTx })
 
     const secret = BigInt(commitment.secret_power) >> 8n
@@ -213,8 +217,9 @@ export function useLotteryContract({
           commitmentInput,
           onStatus,
           customArgs: {
+            value: prayValue,
             functionName: 'playAndPray',
-            args: [`0x${Number(power).toString(16)}`, BigInt(prayValue), prayText],
+            args: [prayText],
           },
         })
       } catch (error: any) {
