@@ -12,7 +12,6 @@ import {
 } from 'viem'
 import { waitForTransactionReceipt } from 'viem/actions'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
-// import { generateWithdraw } from '@/lib/lottery/withdraw'
 import { getHash } from '@/lib/lottery/getHash'
 import { getLotteryStatus } from '@/lib/lottery/utils/nextjs/getLotteryStatus'
 import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
@@ -22,6 +21,9 @@ import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
+import relayerApi from '@/lib/relayer'
+import { generateWithdraw } from '../withdraw'
+import axios from 'axios'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -309,62 +311,46 @@ export function useLotteryContract({
 
   const collectRewardMutation = useMutation({
     mutationFn: async ({
-      secret,
-      power,
-      rand,
+      secretPower,
+      startIndex,
       recipient,
       relayer,
       fee = 0n,
       refund = 0n,
-      leaves,
     }: {
-      secret: bigint
-      power: bigint
-      rand: bigint
-      recipient: Address
-      relayer: Address
+      secretPower: bigint
+      startIndex: number
+      recipient: string
+      relayer: string
       fee?: bigint
       refund?: bigint
-      leaves: bigint[]
     }) => {
-      // try {
-      //   if (!walletClient || !publicClient) throw new Error('Wallet not connected')
-      //   const withdrawOutput = await generateWithdraw({
-      //     secret,
-      //     power,
-      //     rand,
-      //     recipient,
-      //     relayer,
-      //     fee,
-      //     refund,
-      //     leaves,
-      //   })
-      //   if (typeof withdrawOutput !== 'object' || !withdrawOutput.proof || !withdrawOutput.publicSignals) {
-      //     throw new Error('Invalid withdraw proof format')
-      //   }
-      //   const {
-      //     proof,
-      //     publicSignals: { root, nullifier, reward1, reward2, reward3 },
-      //   } = withdrawOutput
-      //   const { pi_a, pi_b, pi_c } = formatProofForContract(proof)
-      //   const { request } = await publicClient.simulateContract({
-      //     address: LOTTERY[foundry.id],
-      //     abi: EthLotteryAbi,
-      //     functionName: 'collect',
-      //     args: [pi_a, pi_b, pi_c, root, nullifier, reward1, reward2, reward3, recipient, relayer, fee, refund],
-      //     value: refund,
-      //     account: walletClient.account.address,
-      //   })
-      //   const txHash = await walletClient.writeContract(request)
-      //   return await waitForTransactionReceipt(publicClient, { hash: txHash })
-      // } catch (error: any) {
-      //   _error(error)
-      //   toast(error?.cause?.reason || error?.message || `${error}`)
-      //   handleStatus(`Error: ${error.message}`)
-      // }
-    },
-    onSuccess: receipt => {
-      // if (receipt) handleStatus(`Receipt: ${JSON.stringify(receipt, null, 2)}`)
+      /** @dev proof build */
+      /** @dev relayer is always defined as 0x0 to make anyone able to relay this transaction */
+      const witness = await generateWithdraw({
+        secretPowerHex: `0x${secretPower.toString(16)}`,
+        startIndexHex: `0x${startIndex.toString(16)}`,
+        recipientHex: recipient,
+        relayerHex: relayer || '0x0',
+        feeHex: `0x${fee.toString(16)}`,
+        refundHex: `0x${refund.toString(16)}`,
+      })
+
+      /** @dev Relayer handoff */
+      const response = await axios.post('/relay/withdraw', {
+        proof: {
+          a: witness[0],
+          b: witness[1],
+          c: witness[2],
+        },
+        inputs: witness[3],
+        recipient,
+        relayer,
+        fee: fee.toString(),
+        refund: refund.toString(),
+      })
+
+      return response.data
     },
   })
 

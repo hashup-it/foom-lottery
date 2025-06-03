@@ -39,7 +39,7 @@ export default function Home() {
   const [status, setStatus] = useState('')
   const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets, setTickets] = useState<string[]>([])
-  const [redeemHex, setRedeemHex] = useState<string>('')
+  const [redeemHex, setRedeemHex] = useState<string>('0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
 
@@ -150,21 +150,24 @@ export default function Home() {
     }
   }
 
-  const handleRedeem = async () => {
+  const
+  handleRedeem = async () => {
     if (!redeemHex) {
       return
     }
 
+    _log('Redeeming ticket:', redeemHex)
+
     collectRewardMutation.mutate({
-      secret: BigInt(redeemHex),
-      power: BigInt(redeemHex) & 0xffn,
-      rand: BigInt(leaves.newRand),
-      recipient: account.address as Address,
-      relayer: account.address as Address,
-      fee: 0n,
-      refund: 0n,
-      leaves: leaves.data,
-    })
+  secret: BigInt(redeemHex),
+  power: BigInt(redeemHex) & 0xffn,
+  rand: BigInt(leaves.newRand),
+  recipient: account.address as Address,
+  relayer: RELAYER_ADDRESS, // change this to your backend relayer's address
+  fee: 0n,
+  refund: 0n,
+  leaves: leaves.data,
+})
   }
 
   useEffect(() => {
@@ -373,6 +376,7 @@ export default function Home() {
                 type="text"
                 placeholder="Ticket (hex, 0x…)"
                 value={redeemHex}
+                defaultValue="0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700"
                 onChange={e => setRedeemHex(e.target.value)}
                 disabled={isLeavesLoading}
               />
@@ -381,7 +385,7 @@ export default function Home() {
           <Button
             variant="outline"
             className="mt-2 disabled:!cursor-not-allowed"
-            disabled={isLeavesLoading || !redeemHex || true}
+            disabled={isLeavesLoading || !redeemHex}
             onClick={handleRedeem}
           >
             {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}

@@ -289,7 +289,7 @@ async function getLines(path: string) {
 
 export {
   // mimicMerkleTree,
-  readLast,
+  // readLast,
   // getLeaves,
   // getPath,
   // getLastPath,
