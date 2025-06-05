@@ -22,7 +22,7 @@ import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
 import { generateWithdraw } from '../withdraw'
-import axios from 'axios'
+import relayerApi from '@/lib/relayer'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -333,10 +333,12 @@ export function useLotteryContract({
         relayerHex: relayer || '0x0',
         feeHex: `0x${fee.toString(16)}`,
         refundHex: `0x${refund.toString(16)}`,
+        handleStatus,
       })
 
       /** @dev Relayer handoff */
-      const response = await axios.post('/relay/withdraw', {
+      handleStatus('Handing off to relayer...')
+      const response = await relayerApi.post('/relay/withdraw', {
         proof: {
           a: witness[0],
           b: witness[1],

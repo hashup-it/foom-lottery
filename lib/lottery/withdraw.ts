@@ -1,31 +1,43 @@
 import path from 'path'
 import { groth16 } from 'snarkjs'
 import { ethers } from 'ethers'
-import { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, leBufferToBigint } from './utils/bigint'
+import {
+  hexToBigint,
+  bigintToHex,
+  leBigintToBuffer,
+  reverseBits,
+  leBufferToBigint,
+  bigintToHexRaw,
+} from './utils/bigint'
 import { pedersenHash } from './utils/pedersen'
 import { buildMimcSponge } from 'circomlibjs'
 import indexer from '../indexer'
 import { AxiosResponse } from 'axios'
+import { _log, _warn } from '@/lib/utils/ts'
+import { toast } from 'sonner'
+import { encodeAbiParameters, hexToBigInt } from 'viem'
 
-interface BetResponse {
-  betIndex: number
-  betRand: bigint
-  nextIndex: number
-}
+// {
+//   betIndex: number
+//   betRand: bigint
+//   nextIndex: number
+// }
+type BetResponse = [number, bigint, number]
 
-interface PathResponse {
-  pathElements: bigint[]
-}
+// MIMC tree Element[]
+type PathResponse = bigint[]
 
 async function findBetFromApi(hash: bigint, startIndex: number): Promise<BetResponse> {
   try {
-    const response: AxiosResponse<BetResponse> = await indexer.get('/leaf', {
+    const response: AxiosResponse<BetResponse> = await indexer.get('/lottery/leaf', {
       params: {
         hash: bigintToHex(hash),
         startIndex: startIndex.toString(16),
       },
     })
-    return response.data
+
+    const result = response.data
+    return result
   } catch (error: any) {
     throw new Error(`Error fetching bet: ${error.message}`)
   }
@@ -33,13 +45,13 @@ async function findBetFromApi(hash: bigint, startIndex: number): Promise<BetResp
 
 async function getPathFromApi(betIndex: number, nextIndex: number): Promise<bigint[]> {
   try {
-    const response: AxiosResponse<PathResponse> = await indexer.get('/proof-path', {
+    const response: AxiosResponse<PathResponse> = await indexer.get('/lottery/proof-path', {
       params: {
         index: betIndex,
         nextIndex: nextIndex,
       },
     })
-    return response.data.pathElements
+    return response.data
   } catch (error: any) {
     throw new Error(`Error fetching path: ${error.message}`)
   }
@@ -52,6 +64,7 @@ export async function generateWithdraw({
   relayerHex,
   feeHex,
   refundHex,
+  handleStatus,
 }: {
   secretPowerHex: string
   startIndexHex: string
@@ -59,6 +72,7 @@ export async function generateWithdraw({
   relayerHex: string
   feeHex: string
   refundHex: string
+  handleStatus?: (msg: string) => void
 }) {
   const mimcsponge = await buildMimcSponge()
   const secret_power = hexToBigint(secretPowerHex)
@@ -66,18 +80,24 @@ export async function generateWithdraw({
   const power = secret_power & 0x1fn
   const hash = await pedersenHash(leBigintToBuffer(secret, 31))
   const hash_power1 = hash + power + 1n
-  const startindex = parseInt(startIndexHex.replace(/^0x0*/, ''), 16)
+  const startindex = Number(startIndexHex)
 
-  const { betIndex, betRand, nextIndex } = await findBetFromApi(hash_power1, startindex)
+  const [betIndex, betRand, nextIndex] = await findBetFromApi(hash_power1, startindex)
+
+  _log('results', betIndex, betRand, `(0x${BigInt(betRand).toString(16)})`, nextIndex)
 
   if (betIndex > 0 && betRand == 0n) {
     throw 'bet not processed yet for ' + bigintToHex(hash_power1) + ' starting at ' + startindex.toString(16)
   }
   if (betIndex == 0) {
+    toast(`Your bet was not found!`)
+    _warn(`Bet with hash ${bigintToHexRaw(hash)} not found`)
     throw 'bet not found for ' + bigintToHex(hash_power1) + ' starting at ' + startindex.toString(16)
   }
 
   const bigindex = BigInt(betIndex)
+
+  _log('bigindex:', bigindex)
   const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret, betRand, bigindex])))
 
   const power1 = 10n
@@ -100,7 +120,12 @@ export async function generateWithdraw({
   const terces = reverseBits(dice, 31 * 8)
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31))
 
+  _log('getting:', betIndex, nextIndex)
   const pathElements = await getPathFromApi(betIndex, nextIndex)
+
+  const hexPathElements = pathElements.map(el => `0x${BigInt(`${el}`).toString(16)}`)
+  handleStatus?.(`Path elements: ${JSON.stringify(hexPathElements, null, 2)}`)
+  _log('Path elements:', hexPathElements)
 
   const input = {
     root: pathElements[32],
@@ -117,18 +142,27 @@ export async function generateWithdraw({
     pathElements: pathElements.slice(0, 32),
   }
 
+  handleStatus?.(`Proofing input: ${JSON.stringify({ ...input, secret: '<hidden>' }, null, 2)}`)
+  _log('Proofing input:', { ...input, secret: '<hidden>' })
+
   const { proof } = await groth16.fullProve(
     input,
-    path.join(__dirname, '../groth16/withdraw.wasm'),
-    path.join(__dirname, '../groth16/withdraw_final.zkey')
+    'circuit_artifacts/withdraw_js/withdraw.wasm',
+    'circuit_artifacts/withdraw_final.zkey'
   )
 
-  const pA = proof.pi_a.slice(0, 2)
-  const pB = proof.pi_b.slice(0, 2)
-  const pC = proof.pi_c.slice(0, 2)
+  handleStatus?.(`Proof: ${JSON.stringify(proof, null, 2)}`)
+  _log('Proof:', proof)
 
-  const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ['uint256[2]', 'uint256[2][2]', 'uint256[2]', 'uint[7]'],
+  const pA = proof.pi_a.slice(0, 2).map(BigInt) as [bigint, bigint]
+  const pB = proof.pi_b.slice(0, 2).map((arr: string[]) => arr.slice(0, 2).map(BigInt) as [bigint, bigint]) as [
+    [bigint, bigint],
+    [bigint, bigint],
+  ]
+  const pC = proof.pi_c.slice(0, 2).map(BigInt) as [bigint, bigint]
+
+  const witness = encodeAbiParameters(
+    [{ type: 'uint256[2]' }, { type: 'uint256[2][2]' }, { type: 'uint256[2]' }, { type: 'uint256[7]' }],
     [
       pA,
       [
@@ -137,15 +171,17 @@ export async function generateWithdraw({
       ],
       pC,
       [
-        bigintToHex(pathElements[32]),
-        bigintToHex(nullifierHash),
-        bigintToHex(rewardbits),
-        recipientHex,
-        relayerHex,
-        feeHex,
-        refundHex,
+        BigInt(pathElements[32]),
+        BigInt(nullifierHash),
+        BigInt(rewardbits),
+        BigInt(recipientHex),
+        BigInt(relayerHex),
+        BigInt(feeHex),
+        BigInt(refundHex),
       ],
     ]
   )
+
+  handleStatus?.(`Encoded witness: ${witness}`)
   return witness
 }

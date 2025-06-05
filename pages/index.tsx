@@ -42,7 +42,7 @@ export default function Home() {
   const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets, setTickets] = useState<string[]>([])
   const [redeemHex, setRedeemHex] = useState<string>(
-    '0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700'
+    ''
   )
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
@@ -166,10 +166,11 @@ export default function Home() {
 
       /** @dev recompute hash */
       const ticketHash = await pedersenHash(leBigintToBuffer(secret, 31))
+      _log('Ticket hash computed:', ticketHash, `0x${ticketHash.toString(16)}`)
 
-      const { data: startIndex } = await indexer.get('/start-index', {
+      const { data: startIndex } = await indexer.get('/lottery/start-index', {
         params: {
-          hash: `${ticketHash}`,
+          hash: `0x${ticketHash.toString(16)}`,
         },
       })
 
@@ -387,7 +388,6 @@ export default function Home() {
                 type="text"
                 placeholder="Ticket (hex, 0x…)"
                 value={redeemHex}
-                defaultValue="0xd4f7f4452614a80cb011b80f79da235067ca1778298be775b8b31e6f16148700"
                 onChange={e => setRedeemHex(e.target.value)}
                 disabled={false}
               />
