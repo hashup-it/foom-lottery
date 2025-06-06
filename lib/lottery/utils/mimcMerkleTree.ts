@@ -35,12 +35,12 @@ async function getLines(path: string) {
 }
 
 // async function readLast() {
-  // Read from the Dexie database instead / fetch from API directly for newest data and cache later
-  // const db = new Dexie('lottery')
-  // const lastRecord = await db.table('last').get(1)
-  // if (lastRecord) {
-  //   return [lastRecord.nextIndex, lastRecord.blockNumber, hexToBigint(lastRecord.lastRoot), hexToBigint(lastRecord.lastLeaf)]
-  // }
+// Read from the Dexie database instead / fetch from API directly for newest data and cache later
+// const db = new Dexie('lottery')
+// const lastRecord = await db.table('last').get(1)
+// if (lastRecord) {
+//   return [lastRecord.nextIndex, lastRecord.blockNumber, hexToBigint(lastRecord.lastRoot), hexToBigint(lastRecord.lastLeaf)]
+// }
 
 //   const lines = await getLines('www/last.csv')
 //   const [nextIndex, blockNumber, lastRoot, lastLeaf] = lines[0].split(',')

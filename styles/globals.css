@@ -85,10 +85,8 @@
 
 @font-face {
   font-family: 'Nippo Variable';
-  src:
-    url('/assets/fonts/Nippo-Variable.woff2') format('woff2'),
-    url('/assets/fonts/Nippo-Variable.woff') format('woff'),
-    url('/assets/fonts/Nippo-Variable.ttf') format('truetype');
+  src: url('/assets/fonts/Nippo-Variable.woff2') format('woff2'),
+    url('/assets/fonts/Nippo-Variable.woff') format('woff'), url('/assets/fonts/Nippo-Variable.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -212,9 +210,7 @@ body {
 }
 
 tooltip {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: 1px solid #374151;
 }
 

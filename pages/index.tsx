@@ -41,9 +41,7 @@ export default function Home() {
   const [status, setStatus] = useState('')
   const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets, setTickets] = useState<string[]>([])
-  const [redeemHex, setRedeemHex] = useState<string>(
-    ''
-  )
+  const [redeemHex, setRedeemHex] = useState<string>('')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
 

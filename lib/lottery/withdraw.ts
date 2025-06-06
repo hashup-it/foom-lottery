@@ -107,10 +107,10 @@ export async function generateWithdraw({
     power <= power1
       ? ((2n ** (power1 + power2 + power3 + 1n) - 1n) << power) & (2n ** (power1 + power2 + power3 + 1n) - 1n)
       : power <= power2
-        ? (((2n ** (power2 + power3 + 1n) - 1n) << (power + power1)) | (2n ** power1 - 1n)) &
-          (2n ** (power1 + power2 + power3 + 1n) - 1n)
-        : (((2n ** (power3 + 1n) - 1n) << (power + power1 + power2)) | (2n ** (power1 + power2) - 1n)) &
-          (2n ** (power1 + power2 + power3 + 1n) - 1n)
+      ? (((2n ** (power2 + power3 + 1n) - 1n) << (power + power1)) | (2n ** power1 - 1n)) &
+        (2n ** (power1 + power2 + power3 + 1n) - 1n)
+      : (((2n ** (power3 + 1n) - 1n) << (power + power1 + power2)) | (2n ** (power1 + power2) - 1n)) &
+        (2n ** (power1 + power2 + power3 + 1n) - 1n)
   const maskdice = mask & dice
   const rew1 = maskdice & 0b1111111111n ? 0n : 1n
   const rew2 = maskdice & 0b11111111111111110000000000n ? 0n : 1n
@@ -157,7 +157,7 @@ export async function generateWithdraw({
   const pA = proof.pi_a.slice(0, 2).map(BigInt) as [bigint, bigint]
   const pB = proof.pi_b.slice(0, 2).map((arr: string[]) => arr.slice(0, 2).map(BigInt) as [bigint, bigint]) as [
     [bigint, bigint],
-    [bigint, bigint],
+    [bigint, bigint]
   ]
   const pC = proof.pi_c.slice(0, 2).map(BigInt) as [bigint, bigint]
 
