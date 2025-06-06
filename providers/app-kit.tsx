@@ -77,7 +77,7 @@ const modal = createAppKit({
     '--w3m-button-border-radius': '16px',
     '--w3m-border-radius-master': '16px',
     '--w3m-accent': '#64d3d3',
-    '--w3m-font-family': 'IBM Plex Mono',
+    '--w3m-font-family': 'PixeloidSans',
     '--w3m-color-mix': '#121212',
     '--w3m-color-mix-strength': 0,
 

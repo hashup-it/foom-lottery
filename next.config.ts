@@ -3,6 +3,9 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   reactStrictMode: false,
   devIndicators: false,
+  compiler: {
+    styledComponents: true
+  },
   productionBrowserSourceMaps: false,
   transpilePackages: ['shared'],
   experimental: {

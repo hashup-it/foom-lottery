@@ -14,6 +14,9 @@ import { _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
 import type { Address } from 'viem'
 import { getRandIndex } from '@/lib/lottery/utils/getRandIndex'
+import Header from '@/components/ui/header'
+import CyberpunkCard from '@/components/ui/CyberpunkCard'
+import Layout from '@/components/ui/Layout'
 
 const schema = z.object({
   power: z
@@ -183,154 +186,158 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="flex h-[1em]" />
-      <div className="w-full flex items-center justify-start flex-col gap-2">
-        <h1 className="text-2xl font-black">FOOM Lottery</h1>
-        <appkit-button />
+    <div>
+      <Header />
+      <Layout /> 
+      <div className="flex flex-col min-h-screen">
+        <div className="flex h-[1em]" />
+        <div className="w-full flex items-center justify-start flex-col gap-2">
+          <h1 className="text-2xl font-black">FOOM Lottery</h1>
+  
 
-        <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
-          <form onSubmit={form.handleSubmit(data => console.log(data))}>
-            <div>
-              <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
-              {form.formState.errors.power && (
-                <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
-                  {form.formState.errors.power.message}
-                </p>
-              )}
+          <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
+            <form onSubmit={form.handleSubmit(data => console.log(data))}>
+              <div>
+                <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
+                {form.formState.errors.power && (
+                  <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+                    {form.formState.errors.power.message}
+                  </p>
+                )}
+                <div className="flex items-center flex-nowrap gap-4">
+                  <Input
+                    type="number"
+                    placeholder="FOOM power (integer)"
+                    {...form.register('power', { valueAsNumber: true })}
+                  />
+                  {power !== undefined && power !== null && !Number.isNaN(power) && (
+                    <p className="">=&nbsp;{2 + 2 ** power}&nbsp;FOOM</p>
+                  )}
+                </div>
+              </div>
+            </form>
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={handleFormSubmit}
+              disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
+            >
+              {playMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
+            </Button>
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={handleFormSubmit}
+              disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
+            >
+              {playMutation.isPending ? <SpinnerText /> : 'Play'}
+            </Button>
+            <Button
+              variant="outline"
+              className="mt-2 disabled:!cursor-not-allowed"
+              onClick={() => {
+                if (commitment && leaves) {
+                  cancelBetMutation.mutate({
+                    secret: commitment.secret,
+                    power: commitment.power,
+                    index: commitment.index || Number(leaves.index),
+                    leaves: leaves.data,
+                  })
+                  setCommitment(undefined)
+                }
+              }}
+            >
+              {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
+            </Button>
+            <div className="mt-4">
+              <label className="block text-xs text-tertiary italic !pb-1">Deinvestment amount</label>
               <div className="flex items-center flex-nowrap gap-4">
                 <Input
                   type="number"
-                  placeholder="FOOM power (integer)"
-                  {...form.register('power', { valueAsNumber: true })}
+                  placeholder="FOOM amount"
+                  disabled={isLeavesLoading}
                 />
-                {power !== undefined && power !== null && !Number.isNaN(power) && (
-                  <p className="">=&nbsp;{2 + 2 ** power}&nbsp;FOOM</p>
-                )}
               </div>
             </div>
-          </form>
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={handleFormSubmit}
-            disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
-          >
-            {playMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2"
-            onClick={handleFormSubmit}
-            disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
-          >
-            {playMutation.isPending ? <SpinnerText /> : 'Play'}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={() => {
-              if (commitment && leaves) {
-                cancelBetMutation.mutate({
-                  secret: commitment.secret,
-                  power: commitment.power,
-                  index: commitment.index || Number(leaves.index),
-                  leaves: leaves.data,
-                })
-                setCommitment(undefined)
-              }
-            }}
-          >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
-          </Button>
-          <div className="mt-4">
-            <label className="block text-xs text-tertiary italic !pb-1">Deinvestment amount</label>
-            <div className="flex items-center flex-nowrap gap-4">
-              <Input
-                type="number"
-                placeholder="FOOM amount"
-                disabled={isLeavesLoading}
-              />
+            <Button
+              variant="outline"
+              className="mt-2 disabled:!cursor-not-allowed mb-4"
+              onClick={() => { }}
+            >
+              {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
+            </Button>
+            <div className="mt-4">
+              <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
+              <div className="flex items-center flex-nowrap gap-4">
+                <Input
+                  type="text"
+                  placeholder="Ticket (hex, 0x…)"
+                  value={redeemHex}
+                  onChange={e => setRedeemHex(e.target.value)}
+                  disabled={isLeavesLoading}
+                />
+              </div>
             </div>
+            <Button
+              variant="outline"
+              className="mt-2 disabled:!cursor-not-allowed"
+              disabled={isLeavesLoading || !redeemHex}
+              onClick={() => {
+                _log('Having Leaves:', leaves, leaves?.newRand, leaves?.data)
+
+                if (leaves && leaves.newRand && leaves.data) {
+                  collectRewardMutation.mutate({
+                    secret: BigInt(redeemHex),
+                    power: BigInt(redeemHex) & 0xffn,
+                    rand: BigInt(leaves.newRand),
+                    recipient: account.address as Address,
+                    relayer: account.address as Address,
+                    fee: 0n,
+                    refund: 0n,
+                    leaves: leaves.data,
+                  })
+                }
+              }}
+            >
+              {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="mt-2 disabled:!cursor-not-allowed"
+              onClick={handleMutateCommit}
+            >
+              {commitMutation.isPending ? <SpinnerText /> : '[Generator]: Commit'}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="mt-2 disabled:!cursor-not-allowed"
+              onClick={handleMutateReveal}
+            >
+              {revealMutation.isPending ? <SpinnerText /> : '[Generator]: Reveal'}
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed mb-4"
-            onClick={() => {}}
-          >
-            {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
-          </Button>
-          <div className="mt-4">
-            <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
-            <div className="flex items-center flex-nowrap gap-4">
-              <Input
-                type="text"
-                placeholder="Ticket (hex, 0x…)"
-                value={redeemHex}
-                onChange={e => setRedeemHex(e.target.value)}
-                disabled={isLeavesLoading}
-              />
-            </div>
+          <div className="w-full max-w-[835px] flex flex-col mb-2">
+            <p className="w-full break-all whitespace-pre-wrap italic font-bold">
+              List of Prayers to God:{'\n'}
+              1. May the lottery be a blessing to all who participate.{'\n'}
+            </p>
           </div>
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            disabled={isLeavesLoading || !redeemHex}
-            onClick={() => {
-              _log('Having Leaves:', leaves, leaves?.newRand, leaves?.data)
-
-              if (leaves && leaves.newRand && leaves.data) {
-                collectRewardMutation.mutate({
-                  secret: BigInt(redeemHex),
-                  power: BigInt(redeemHex) & 0xffn,
-                  rand: BigInt(leaves.newRand),
-                  recipient: account.address as Address,
-                  relayer: account.address as Address,
-                  fee: 0n,
-                  refund: 0n,
-                  leaves: leaves.data,
-                })
-              }
-            }}
-          >
-            {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={handleMutateCommit}
-          >
-            {commitMutation.isPending ? <SpinnerText /> : '[Generator]: Commit'}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="mt-2 disabled:!cursor-not-allowed"
-            onClick={handleMutateReveal}
-          >
-            {revealMutation.isPending ? <SpinnerText /> : '[Generator]: Reveal'}
-          </Button>
+          <div className="w-full max-w-[835px] flex flex-col mb-2">
+            <p className="w-full break-all whitespace-pre-wrap italic font-bold">
+              Lottery Tickets:{'\n'}
+              {!!tickets.length ? tickets?.map((t, i) => `${i + 1}. ${t}`)?.join('\n') : '<none>'}
+            </p>
+          </div>
+          <div className="w-full max-w-[835px] flex flex-col mb-2">
+            <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>
+          </div>
         </div>
-        <div className="w-full max-w-[835px] flex flex-col mb-2">
-          <p className="w-full break-all whitespace-pre-wrap italic font-bold">
-            List of Prayers to God:{'\n'}
-            1. May the lottery be a blessing to all who participate.{'\n'}
-          </p>
-        </div>
-        <div className="w-full max-w-[835px] flex flex-col mb-2">
-          <p className="w-full break-all whitespace-pre-wrap italic font-bold">
-            Lottery Tickets:{'\n'}
-            {!!tickets.length ? tickets?.map((t, i) => `${i + 1}. ${t}`)?.join('\n') : '<none>'}
-          </p>
-        </div>
-        <div className="w-full max-w-[835px] flex flex-col mb-2">
-          <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>
-        </div>
-      </div>
 
-      <div className="flex-grow flex items-end justify-center">
-        <p>&copy; FOOM AI corporation 2025</p>
+        <div className="flex-grow flex items-end justify-center">
+          <p>&copy; FOOM AI corporation 2025</p>
+        </div>
       </div>
     </div>
   )
