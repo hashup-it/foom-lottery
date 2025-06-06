@@ -49,6 +49,7 @@ export function useLotteryContract({
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
 
+  /** TODO: make this accept the same as `_log` to enable proper `_log` f call formatting; only just later format params to be concat with spaces and json-stringified if current param is of type `object`. */
   const handleStatus = (data: string) => {
     _log(data)
     onStatus?.(data)
