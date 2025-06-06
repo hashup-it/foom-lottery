@@ -282,7 +282,20 @@ export default function Home() {
                   <Input
                     type="number"
                     placeholder="FOOM power (integer)"
-                    {...playForm.register('power', { valueAsNumber: true })}
+                    min={0}
+                    max={22}
+                    step={1}
+                    {...playForm.register('power', { valueAsNumber: true, min: 0 })}
+                    onChange={e => {
+                      const value = e.target.value
+                      if (value === '') {
+                        playForm.setValue('power', '' as any as 0)
+                      } else if (Number(value) < 0) {
+                        e.target.value = '0'
+                      } else {
+                        playForm.setValue('power', Number(value))
+                      }
+                    }}
                   />
                   {power !== undefined && power !== null && !Number.isNaN(power) && (
                     <p className="">
@@ -293,7 +306,7 @@ export default function Home() {
               </div>
               <Button
                 variant="outline"
-                className="mt-2"
+                className="mt-2 w-full"
                 onClick={handlePlayFormSubmit}
                 disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
               >
