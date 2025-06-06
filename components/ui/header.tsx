@@ -80,8 +80,8 @@ const NavButton = styled.button`
   }
 `
 
-const MobileMenus = styled.div`
-  display: ${({ open }) => (open ? 'flex' : 'none')};
+const MobileMenus = styled.div<any>`
+  display: ${({ open }: any) => (open ? 'flex' : 'none')};
   flex-direction: column;
   gap: 1rem;
   background: rgba(0, 0, 0, 0.95);
