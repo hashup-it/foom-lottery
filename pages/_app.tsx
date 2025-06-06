@@ -10,6 +10,8 @@ import { Providers } from '@/providers'
 import { Toaster } from '@/components/ui/sonner'
 import BackgroundWrapper from '@/components/ui/backgroundWrapper'
 import { GlobalStyles } from '@/styles/globalStyled'
+import { _log } from '@/lib/utils/ts'
+import { isRemote } from '@/lib/utils/environment'
 
 interface IAppProps extends AppProps {
   cookies: string | null
@@ -26,6 +28,8 @@ function App({ Component, pageProps }: IAppProps) {
   useEffect(() => {
     setIsDebug(localStorage?.getItem('isDebug') === 'true')
   }, [])
+
+  _log('isRemote:', isRemote())
 
   return (
     <BackgroundWrapper>

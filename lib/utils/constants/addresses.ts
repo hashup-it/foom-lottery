@@ -1,4 +1,5 @@
 import { isRemote } from '@/lib/utils/environment'
+import { _log } from '@/lib/utils/ts'
 import { zeroAddress, type Address } from 'viem'
 import { base, baseSepolia, type Chain, foundry, mainnet } from 'viem/chains'
 
