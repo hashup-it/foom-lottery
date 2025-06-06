@@ -4,10 +4,10 @@
 
 @font-face {
   font-family: 'PixeloidSans';
-  src: url('/fonts/PixeloidSans/PixeloidSans.ttf') format('truetype'); 
+  src: url('/fonts/PixeloidSans/PixeloidSans.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  font-display: swap;  
+  font-display: swap;
 }
 
 @layer utilities {
@@ -92,8 +92,6 @@
 }
 
 /* styles/fonts.css */
-
-
 
 @layer base {
   /** @dev CSS colors */
@@ -182,7 +180,7 @@ button {
 body {
   color: white;
   background: var(--background);
-  font-family: 'PixeloidSans', sans-serif; 
+  font-family: 'PixeloidSans', sans-serif;
 }
 
 @layer base {
@@ -214,9 +212,7 @@ body {
 }
 
 tooltip {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: 1px solid #374151;
 }
 

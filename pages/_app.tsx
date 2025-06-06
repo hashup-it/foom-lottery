@@ -30,15 +30,14 @@ function App({ Component, pageProps }: IAppProps) {
   return (
     <BackgroundWrapper>
       <GlobalStyles />
-      <Providers {...{ cookies }}>  
+      <Providers {...{ cookies }}>
         {isDebug && <Vconsole />}
-        <main>  
+        <main>
           <Component {...pageProps} />
         </main>
         <Toaster />
-
       </Providers>
-    </BackgroundWrapper> 
+    </BackgroundWrapper>
   )
 }
 
@@ -46,7 +45,7 @@ App.getInitialProps = async (appContext: AppContext): Promise<IAppProps> => {
   const appProps = await NextApp.getInitialProps(appContext)
   const cookies = appContext.ctx.req?.headers?.cookie || ''
 
-  return { 
+  return {
     ...appProps,
     pageProps: {
       ...appProps.pageProps,

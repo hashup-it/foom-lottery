@@ -1,5 +1,5 @@
-'use client';
-import { useState } from 'react';
+'use client'
+import { useState } from 'react'
 import {
   CardWrapper,
   Title,
@@ -12,11 +12,11 @@ import {
   BuyButton,
   Footer,
   ReadMoreLink,
-} from '../ui/CyberpunkCardLayout';
+} from '../ui/CyberpunkCardLayout'
 
-const betMin = 0.1;
+const betMin = 0.1
 
-const jackpotLevels = [1024, 65536, 4194304]; // Small, Medium, Big
+const jackpotLevels = [1024, 65536, 4194304] // Small, Medium, Big
 
 const lotteryTiers = [
   { price: 3, odds: ['1/1024', '1/65536', '1/4194304'] },
@@ -42,16 +42,16 @@ const lotteryTiers = [
   { price: 1048578, odds: ['1/1024', '1/65536', '1/4'] },
   { price: 2097154, odds: ['1/1024', '1/65536', '1/2'] },
   { price: 4194306, odds: ['1/1024', '1/65536', '1/1'] },
-];
+]
 
 export default function PlayLottery() {
-  const [selectedTier, setSelectedTier] = useState(0);
-  const [selectedJackpot, setSelectedJackpot] = useState(0); // 0 = small, 1 = medium, 2 = big
+  const [selectedTier, setSelectedTier] = useState(0)
+  const [selectedJackpot, setSelectedJackpot] = useState(0) // 0 = small, 1 = medium, 2 = big
 
-  const tier = lotteryTiers[selectedTier];
-  const ticketValue = (tier.price * betMin).toFixed(2);
-  const potentialWin = (jackpotLevels[selectedJackpot] * betMin).toFixed(2);
-  const odds = tier.odds[selectedJackpot];
+  const tier = lotteryTiers[selectedTier]
+  const ticketValue = (tier.price * betMin).toFixed(2)
+  const potentialWin = (jackpotLevels[selectedJackpot] * betMin).toFixed(2)
+  const odds = tier.odds[selectedJackpot]
 
   return (
     <CardWrapper>
@@ -83,10 +83,13 @@ export default function PlayLottery() {
         <InputBox
           as="select"
           value={selectedTier}
-          onChange={(e) => setSelectedTier(parseInt(e.target.value))}
+          onChange={e => setSelectedTier(parseInt(e.target.value))}
         >
           {lotteryTiers.map((tier, index) => (
-            <option key={index} value={index}>
+            <option
+              key={index}
+              value={index}
+            >
               Power {index} (Price: ${(tier.price * betMin).toFixed(2)})
             </option>
           ))}
@@ -115,5 +118,5 @@ export default function PlayLottery() {
         <ReadMoreLink>Read more</ReadMoreLink> about ticket ☐
       </Footer>
     </CardWrapper>
-  );
+  )
 }

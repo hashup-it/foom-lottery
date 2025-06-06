@@ -1,2 +1,2 @@
 /** @dev localhost */
-export const ADDRESS = '';
+export const ADDRESS = ''

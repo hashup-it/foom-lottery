@@ -7,4 +7,3 @@ export function keccak256Abi(value: bigint): `0x${string}` {
 export function keccak256Uint(value: bigint): `0x${string}` {
   return keccak256(encodePacked(['uint256'], [value]))
 }
-

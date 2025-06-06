@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   devIndicators: false,
   compiler: {
-    styledComponents: true
+    styledComponents: true,
   },
   productionBrowserSourceMaps: false,
   transpilePackages: ['shared'],

@@ -188,12 +188,11 @@ export default function Home() {
   return (
     <div>
       <Header />
-      <Layout /> 
+      <Layout />
       <div className="flex flex-col min-h-screen">
         <div className="flex h-[1em]" />
         <div className="w-full flex items-center justify-start flex-col gap-2">
           <h1 className="text-2xl font-black">FOOM Lottery</h1>
-  
 
           <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
             <form onSubmit={form.handleSubmit(data => console.log(data))}>
@@ -262,7 +261,7 @@ export default function Home() {
             <Button
               variant="outline"
               className="mt-2 disabled:!cursor-not-allowed mb-4"
-              onClick={() => { }}
+              onClick={() => {}}
             >
               {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
             </Button>

@@ -1,6 +1,6 @@
-'use client';
-import { BuyButton, CardWrapper, InputBox } from "../ui/CyberpunkCardLayout";
-import styled from "styled-components";
+'use client'
+import { BuyButton, CardWrapper, InputBox } from '../ui/CyberpunkCardLayout'
+import styled from 'styled-components'
 
 const mockWinners = [
   { address: '0xA1b2...9D3f', reward: '$102.40', prayer: 'Praise the chain', time: '2 min ago' },
@@ -13,12 +13,12 @@ const mockWinners = [
   { address: '0xFA32...De91', reward: '$102.40', prayer: 'Miners be praised', time: '3h ago' },
   { address: '0x77E4...Cc02', reward: '$655.36', prayer: 'Hydra is eternal', time: '5h ago' },
   { address: '0x41B7...Fe11', reward: '$102.40', prayer: '', time: '7h ago' },
-];
+]
 
 const WinnerList = styled.div`
   margin-top: 1.5rem;
   border-top: 1px solid white;
-`;
+`
 
 const WinnerRow = styled.div`
   display: grid;
@@ -44,18 +44,18 @@ const WinnerRow = styled.div`
       white-space: normal;
     }
   }
-`;
+`
 
 const WinnerHeader = styled(WinnerRow)`
   font-weight: bold;
-  background: rgba(0, 255, 204, 0.15); 
+  background: rgba(0, 255, 204, 0.15);
   border-bottom: 1px solid white;
   color: #00ffcc;
-`;
+`
 
 export default function CheckTicket() {
   return (
-    <CardWrapper> 
+    <CardWrapper>
       <h1 style={{ color: 'white', fontSize: '1rem' }}>Check Ticket</h1>
 
       <InputBox placeholder="Enter your lottery ticket" />
@@ -76,11 +76,11 @@ export default function CheckTicket() {
           <WinnerRow key={i}>
             <span>{w.address}</span>
             <span>{w.reward}</span>
-            <span>{w.prayer || '—'}</span> 
-            <span>{w.time}</span> 
-          </WinnerRow>   
+            <span>{w.prayer || '—'}</span>
+            <span>{w.time}</span>
+          </WinnerRow>
         ))}
       </WinnerList>
     </CardWrapper>
-  );
+  )
 }

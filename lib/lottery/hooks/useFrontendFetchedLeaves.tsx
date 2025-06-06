@@ -81,7 +81,7 @@ export function useFrontendFetchedLeaves({ fromBlock = 0n }: { fromBlock?: bigin
         newRand: lastRand,
         newHash: lastHash,
         data: leaves,
-        betLogs: betIns
+        betLogs: betIns,
       }
     },
   })
