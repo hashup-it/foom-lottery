@@ -82,6 +82,14 @@ export function useLotteryContract({
 
     status('Generating commitment...')
     const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
+
+    const ticketStr = commitment.secret_power
+    const storedTickets = JSON.parse(localStorage.getItem('lotteryTickets') || '[]')
+    if (!storedTickets.includes(ticketStr)) {
+      const updatedTickets = [...storedTickets, ticketStr]
+      localStorage.setItem('lotteryTickets', JSON.stringify(updatedTickets))
+    }
+
     status(`Commitment Hash: ${commitment.hash}`)
     status(`Ticket: ${commitment.secret_power}`)
 
