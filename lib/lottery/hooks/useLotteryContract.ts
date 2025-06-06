@@ -83,6 +83,7 @@ export function useLotteryContract({
     status('Generating commitment...')
     const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
     status(`Commitment Hash: ${commitment.hash}`)
+    status(`Ticket: ${commitment.secret_power}`)
 
     const foomBalance = await publicClient.readContract({
       address: FOOM[chain.id],
