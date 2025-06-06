@@ -5,7 +5,7 @@ import { parseAbiItem, decodeEventLog } from 'viem'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { _log } from '@/lib/utils/ts'
 import { foundry } from 'viem/chains'
-import { LOTTERY } from '@/lib/utils/constants/addresses'
+import { chain, LOTTERY } from '@/lib/utils/constants/addresses'
 
 const LOG_BET_IN_EVENT = parseAbiItem('event LogBetIn(uint256 index, uint256 newHash)')
 const LOG_UPDATE_EVENT = parseAbiItem('event LogUpdate(uint256 index, uint256 newRand, uint256 newRoot)')
@@ -16,17 +16,19 @@ export function useFrontendFetchedLeaves({ fromBlock = 0n }: { fromBlock?: bigin
   return useQuery({
     queryKey: ['leaves', fromBlock],
     queryFn: async () => {
-      if (!publicClient) throw new Error('No public client')
+      if (!publicClient) {
+        throw new Error('No public client')
+      }
 
       const [rawBetIns, rawUpdates] = await Promise.all([
         publicClient.getLogs({
-          address: LOTTERY[foundry.id],
+          address: LOTTERY[chain.id],
           event: LOG_BET_IN_EVENT,
           fromBlock,
           toBlock: 'latest',
         }),
         publicClient.getLogs({
-          address: LOTTERY[foundry.id],
+          address: LOTTERY[chain.id],
           event: LOG_UPDATE_EVENT,
           fromBlock,
           toBlock: 'latest',

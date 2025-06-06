@@ -3,26 +3,17 @@ import NextApp from 'next/app'
 import '@reown/appkit-wallet-button/react'
 import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
-import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 
 import '@/styles/globals.css'
 import '@/lib/utils/node'
 import { Providers } from '@/providers'
 import { Toaster } from '@/components/ui/sonner'
+import BackgroundWrapper from '@/components/ui/backgroundWrapper'
+import { GlobalStyles } from '@/styles/globalStyled'
 
 interface IAppProps extends AppProps {
   cookies: string | null
 }
-
-const ibmPlexSans = IBM_Plex_Sans({
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
-})
-
-const ibmPlexMono = IBM_Plex_Mono({
-  weight: ['400', '500', '600'],
-  subsets: ['latin'],
-})
 
 const Vconsole = dynamic(() => import('@/plugins/vconsole'), {
   ssr: false,
@@ -37,13 +28,16 @@ function App({ Component, pageProps }: IAppProps) {
   }, [])
 
   return (
-    <Providers {...{ cookies }}>
-      {isDebug && <Vconsole />}
-      <main className={`${ibmPlexSans.className} ${ibmPlexMono.className}`}>
-        <Component {...pageProps} />
-      </main>
-      <Toaster />
-    </Providers>
+    <BackgroundWrapper>
+      <GlobalStyles />
+      <Providers {...{ cookies }}>
+        {isDebug && <Vconsole />}
+        <main>
+          <Component {...pageProps} />
+        </main>
+        <Toaster />
+      </Providers>
+    </BackgroundWrapper>
   )
 }
 

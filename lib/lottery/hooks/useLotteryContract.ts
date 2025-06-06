@@ -17,7 +17,7 @@ import { getLotteryStatus } from '@/lib/lottery/utils/nextjs/getLotteryStatus'
 import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
 import { toast } from 'sonner'
 import { _error, _log } from '@/lib/utils/ts'
-import { FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
+import { chain, FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
@@ -85,7 +85,7 @@ export function useLotteryContract({
     status(`Commitment Hash: ${commitment.hash}`)
 
     const foomBalance = await publicClient.readContract({
-      address: FOOM[foundry.id],
+      address: FOOM[chain.id],
       abi: erc20Abi,
       functionName: 'balanceOf',
       args: [walletClient.account.address],
@@ -93,10 +93,10 @@ export function useLotteryContract({
     status(`FOOM Balance: ${foomBalance}`)
 
     const currentAllowance = await publicClient.readContract({
-      address: FOOM[foundry.id],
+      address: FOOM[chain.id],
       abi: erc20Abi,
       functionName: 'allowance',
-      args: [walletClient.account.address, LOTTERY[foundry.id]],
+      args: [walletClient.account.address, LOTTERY[chain.id]],
     })
     status(`Current FOOM Allowance: ${currentAllowance}, needed FOOM allowance: ${playAmount}`)
 
@@ -105,19 +105,19 @@ export function useLotteryContract({
     status(`Playing with FOOM tokens...`)
     if (currentAllowance < playAmount) {
       const { request: approveRequest } = await publicClient.simulateContract({
-        address: FOOM[foundry.id],
+        address: FOOM[chain.id],
         abi: erc20Abi,
         functionName: 'approve',
-        args: [LOTTERY[foundry.id], playAmount],
+        args: [LOTTERY[chain.id], playAmount],
         account: walletClient.account.address,
       })
       const approveTx = await walletClient.writeContract(approveRequest)
       await waitForTransactionReceipt(publicClient, { hash: approveTx })
       let updatedAllowance = await publicClient.readContract({
-        address: FOOM[foundry.id],
+        address: FOOM[chain.id],
         abi: erc20Abi,
         functionName: 'allowance',
-        args: [walletClient.account.address, LOTTERY[foundry.id]],
+        args: [walletClient.account.address, LOTTERY[chain.id]],
       })
       status(`Updated FOOM Allowance: ${updatedAllowance}`)
       if (updatedAllowance < playAmount) {
@@ -133,7 +133,7 @@ export function useLotteryContract({
     _log('Nonce:', correctNonce)
 
     const { request: playRequest } = await publicClient.simulateContract({
-      address: LOTTERY[foundry.id],
+      address: LOTTERY[chain.id],
       abi: EthLotteryAbi,
       functionName: customArgs.functionName || 'play',
       args: [commitment.hash, BigInt(power), ...(customArgs.args ?? [])],
@@ -289,7 +289,7 @@ export function useLotteryContract({
       //   const fee = 0n
       //   const refund = 0n
       //   const { request } = await publicClient.simulateContract({
-      //     address: LOTTERY[foundry.id],
+      //     address: LOTTERY[chain.id],
       //     abi: EthLotteryAbi,
       //     functionName: 'cancelbet',
       //     args: [index, pi_a, pi_b, pi_c, recipient, relayer, fee, refund],
