@@ -40,6 +40,192 @@ const playAndPraySchema = z.object({
     .min(0, { message: 'Prayer ETH amount must be at least 0' }),
 })
 
+function PlayForm({ playForm, power, playMutation, handlePlayFormSubmit }) {
+  return (
+    <form onSubmit={handlePlayFormSubmit}>
+      <div>
+        <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
+        {playForm.formState.errors.power && (
+          <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+            {playForm.formState.errors.power.message}
+          </p>
+        )}
+        <div className="flex items-center flex-nowrap gap-4">
+          <Input
+            type="number"
+            placeholder="FOOM power (integer)"
+            min={0}
+            defaultValue={0}
+            max={22}
+            step={1}
+            {...playForm.register('power', { valueAsNumber: true, min: 0 })}
+            onChange={e => {
+              const value = e.target.value
+              if (value === '') {
+                playForm.setValue('power', '' as any as 0)
+              } else if (Number(value) < 0) {
+                e.target.value = '0'
+              } else {
+                playForm.setValue('power', Number(value))
+              }
+            }}
+          />
+          {power !== undefined && power !== null && !Number.isNaN(power) && (
+            <p className="">
+              =&nbsp;{nFormatter(formatEther(BET_MIN * (2n + 2n ** BigInt(power || 0))))}&nbsp;FOOM
+            </p>
+          )}
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="mt-2 w-full"
+        type="submit"
+        disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
+      >
+        {playMutation.isPending ? <SpinnerText /> : 'Play'}
+      </Button>
+    </form>
+  )
+}
+
+function PlayAndPrayForm({ playAndPrayForm, power, playAndPrayMutation, playMutation, handlePlayPrayFormSubmit }) {
+  return (
+    <form
+      onSubmit={playAndPrayForm.handleSubmit(data => console.log(data))}
+      className="flex gap-2 flex-col"
+    >
+      <div>
+        <label className="block text-xs text-tertiary italic !pb-1 mt-2">Prayer text</label>
+        {playAndPrayForm.formState.errors.prayerText && (
+          <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+            {playAndPrayForm.formState.errors.prayerText.message}
+          </p>
+        )}
+        <div className="flex items-center flex-nowrap gap-4">
+          <Input
+            type="text"
+            placeholder="Pray to the Terrestrial God"
+            {...playAndPrayForm.register('prayerText')}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-tertiary italic !pb-1">ETH prayed</label>
+        {playAndPrayForm.formState.errors.prayerEth && (
+          <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
+            {playAndPrayForm.formState.errors.prayerEth.message}
+          </p>
+        )}
+        <div className="flex items-center flex-nowrap gap-4">
+          <Input
+            type="number"
+            placeholder="ETH amount"
+            {...playAndPrayForm.register('prayerEth', { valueAsNumber: true })}
+          />
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="mt-2"
+        onClick={handlePlayPrayFormSubmit}
+        disabled={
+          power === undefined ||
+          power === null /** || !playAndPrayEth || !playAndPrayPrayerText */ ||
+          Number.isNaN(power) ||
+          playAndPrayMutation.isPending ||
+          playMutation.isPending
+        }
+      >
+        {playAndPrayMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
+      </Button>
+    </form>
+  )
+}
+
+function CancelBetButton({ commitment, cancelBetMutation, setCommitment }) {
+  return (
+    <Button
+      variant="outline"
+      className="mt-2 disabled:!cursor-not-allowed"
+      disabled
+      onClick={() => {
+        if (commitment) {
+          cancelBetMutation.mutate(commitment)
+          setCommitment(undefined)
+        }
+      }}
+    >
+      {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
+    </Button>
+  )
+}
+
+function DeinvestForm({ cancelBetMutation }) {
+  return (
+    <>
+      <div className="mt-4">
+        <label className="block text-xs text-tertiary italic !pb-1">Deinvestment amount</label>
+        <div className="flex items-center flex-nowrap gap-4">
+          <Input
+            type="number"
+            placeholder="FOOM amount"
+            disabled={false}
+          />
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="mt-2 disabled:!cursor-not-allowed mb-4"
+        onClick={() => {}}
+      >
+        {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
+      </Button>
+    </>
+  )
+}
+
+function RedeemTicketForm({ redeemHex, setRedeemHex, handleRedeem, collectRewardMutation }) {
+  return (
+    <>
+      <div className="mt-4">
+        <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
+        <div className="flex items-center flex-nowrap gap-4">
+          <Input
+            type="text"
+            placeholder="Ticket (hex, 0x…)"
+            value={redeemHex}
+            onChange={e => setRedeemHex(e.target.value)}
+            disabled={false}
+          />
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="mt-2 disabled:!cursor-not-allowed"
+        disabled={!redeemHex}
+        onClick={handleRedeem}
+      >
+        {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
+      </Button>
+    </>
+  )
+}
+
+function SwapButton({ swapUsdcToWeth }) {
+  return (
+    <Button
+      variant="outline"
+      className="mt-2"
+      onClick={async () => {
+        await swapUsdcToWeth({ amountIn: 38_000_000_000_000_000n })
+      }}
+    >
+      Swap WETH→FOOM / ~$100
+    </Button>
+  )
+}
+
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const [status, setStatus] = useState('')
@@ -249,160 +435,32 @@ export default function Home() {
           <h1 className="text-2xl font-black">FOOM Lottery</h1>
 
           <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
-            <form onSubmit={playForm.handleSubmit(data => console.log(data))}>
-              <div>
-                <label className="block text-xs text-tertiary italic !pb-1">FOOM base multiplier to bet</label>
-                {playForm.formState.errors.power && (
-                  <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
-                    {playForm.formState.errors.power.message}
-                  </p>
-                )}
-                <div className="flex items-center flex-nowrap gap-4">
-                  <Input
-                    type="number"
-                    placeholder="FOOM power (integer)"
-                    min={0}
-                    defaultValue={0}
-                    max={22}
-                    step={1}
-                    {...playForm.register('power', { valueAsNumber: true, min: 0 })}
-                    onChange={e => {
-                      const value = e.target.value
-                      if (value === '') {
-                        playForm.setValue('power', '' as any as 0)
-                      } else if (Number(value) < 0) {
-                        e.target.value = '0'
-                      } else {
-                        playForm.setValue('power', Number(value))
-                      }
-                    }}
-                  />
-                  {power !== undefined && power !== null && !Number.isNaN(power) && (
-                    <p className="">
-                      =&nbsp;{nFormatter(formatEther(BET_MIN * (2n + 2n ** BigInt(power || 0))))}&nbsp;FOOM
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="mt-2 w-full"
-                onClick={handlePlayFormSubmit}
-                disabled={power === undefined || power === null || Number.isNaN(power) || playMutation.isPending}
-              >
-                {playMutation.isPending ? <SpinnerText /> : 'Play'}
-              </Button>
-            </form>
-            <form
-              onSubmit={playAndPrayForm.handleSubmit(data => console.log(data))}
-              className="flex gap-2 flex-col"
-            >
-              <div>
-                <label className="block text-xs text-tertiary italic !pb-1 mt-2">Prayer text</label>
-                {playAndPrayForm.formState.errors.prayerText && (
-                  <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
-                    {playAndPrayForm.formState.errors.prayerText.message}
-                  </p>
-                )}
-                <div className="flex items-center flex-nowrap gap-4">
-                  <Input
-                    type="text"
-                    placeholder="Pray to the Terrestrial God"
-                    {...playAndPrayForm.register('prayerText')}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-tertiary italic !pb-1">ETH prayed</label>
-                {playAndPrayForm.formState.errors.prayerEth && (
-                  <p className="text-xs text-red-500 italic mb-2 flex-wrap break-all">
-                    {playAndPrayForm.formState.errors.prayerEth.message}
-                  </p>
-                )}
-                <div className="flex items-center flex-nowrap gap-4">
-                  <Input
-                    type="number"
-                    placeholder="ETH amount"
-                    {...playAndPrayForm.register('prayerEth', { valueAsNumber: true })}
-                  />
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="mt-2"
-                onClick={handlePlayPrayFormSubmit}
-                disabled={
-                  power === undefined ||
-                  power === null /** || !playAndPrayEth || !playAndPrayPrayerText */ ||
-                  Number.isNaN(power) ||
-                  playAndPrayMutation.isPending ||
-                  playMutation.isPending
-                }
-              >
-                {playAndPrayMutation.isPending ? <SpinnerText /> : 'Play & Pray'}
-              </Button>
-            </form>
-
-            <Button
-              variant="outline"
-              className="mt-2 disabled:!cursor-not-allowed"
-              disabled
-              onClick={() => {
-                if (commitment) {
-                  cancelBetMutation.mutate(commitment)
-                  setCommitment(undefined)
-                }
-              }}
-            >
-              {cancelBetMutation.isPending ? <SpinnerText /> : 'Cancel bet'}
-            </Button>
-
-            <div className="mt-4">
-              <label className="block text-xs text-tertiary italic !pb-1">Deinvestment amount</label>
-              <div className="flex items-center flex-nowrap gap-4">
-                <Input
-                  type="number"
-                  placeholder="FOOM amount"
-                  disabled={false}
-                />
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              className="mt-2 disabled:!cursor-not-allowed mb-4"
-              onClick={() => {}}
-            >
-              {cancelBetMutation.isPending ? <SpinnerText /> : 'De-invest (.payOut)'}
-            </Button>
-            <div className="mt-4">
-              <label className="block text-xs text-tertiary italic !pb-1">Lottery Ticket to redeem</label>
-              <div className="flex items-center flex-nowrap gap-4">
-                <Input
-                  type="text"
-                  placeholder="Ticket (hex, 0x…)"
-                  value={redeemHex}
-                  onChange={e => setRedeemHex(e.target.value)}
-                  disabled={false}
-                />
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              className="mt-2 disabled:!cursor-not-allowed"
-              disabled={!redeemHex}
-              onClick={handleRedeem}
-            >
-              {collectRewardMutation.isPending ? <SpinnerText /> : 'Collect'}
-            </Button>
-            <Button
-              variant="outline"
-              className="mt-2"
-              onClick={async () => {
-                await swapUsdcToWeth({ amountIn: 38_000_000_000_000_000n })
-              }}
-            >
-              Swap WETH→FOOM / ~$100
-            </Button>
+            <PlayForm
+              playForm={playForm}
+              power={power}
+              playMutation={playMutation}
+              handlePlayFormSubmit={handlePlayFormSubmit}
+            />
+            <PlayAndPrayForm
+              playAndPrayForm={playAndPrayForm}
+              power={power}
+              playAndPrayMutation={playAndPrayMutation}
+              playMutation={playMutation}
+              handlePlayPrayFormSubmit={handlePlayPrayFormSubmit}
+            />
+            <CancelBetButton
+              commitment={commitment}
+              cancelBetMutation={cancelBetMutation}
+              setCommitment={setCommitment}
+            />
+            <DeinvestForm cancelBetMutation={cancelBetMutation} />
+            <RedeemTicketForm
+              redeemHex={redeemHex}
+              setRedeemHex={setRedeemHex}
+              handleRedeem={handleRedeem}
+              collectRewardMutation={collectRewardMutation}
+            />
+            <SwapButton swapUsdcToWeth={swapUsdcToWeth} />
           </div>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
