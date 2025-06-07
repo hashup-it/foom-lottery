@@ -19,6 +19,7 @@ import SpinnerText from '@/components/shared/spinner-text'
 import { useFoomPrice } from '@/hooks/useFoomPrice'
 import { formatUnits } from 'viem'
 import { nFormatter } from '@/lib/utils/node'
+import { useLottery } from '@/providers/LotteryProvider'
 
 /** @dev 1 million FOOM ~= 0.10 USD */
 const betMin = 1_000_000
@@ -84,6 +85,8 @@ export default function PlayLottery() {
   ).toFixed(2)
   const odds = tier.odds[selectedJackpot]
 
+  const lottery = useLottery()
+
   return (
     <CardWrapper>
       <Title>Buy lottery ticket</Title>
@@ -146,7 +149,17 @@ export default function PlayLottery() {
         </InfoBlock>
       </DetailsRow>
 
-      <BuyButton>Buy lottery Ticket</BuyButton>
+      <BuyButton
+        disabled={lottery.playMutation.isPending}
+        className="disabled:opacity-50 disabled:cursor-not-allowed"
+        onClick={() =>
+          lottery.play({
+            power: selectedTier,
+          })
+        }
+      >
+        {lottery.playMutation.isPending ? <SpinnerText /> : 'Buy lottery Ticket'}
+      </BuyButton>
 
       <Footer>
         <ReadMoreLink>Read more</ReadMoreLink> about ticket ☐

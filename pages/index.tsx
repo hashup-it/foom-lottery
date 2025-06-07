@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import '@reown/appkit-wallet-button/react'
-import React, { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -8,23 +8,18 @@ import SpinnerText from '@/components/shared/spinner-text'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useLotteryContract } from '@/lib/lottery/hooks/useLotteryContract'
-import type { ICommitment } from '@/types/lottery'
-import { _error, _log } from '@/lib/utils/ts'
+import { _log } from '@/lib/utils/ts'
 import { useAppKitAccount } from '@reown/appkit/react'
-import type { Address } from 'viem'
 import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
-import { erc20Abi, formatEther, parseEther, parseUnits } from 'viem'
+import { erc20Abi, formatEther, parseEther } from 'viem'
 import { useWalletClient, usePublicClient } from 'wagmi'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { nFormatter } from '@/lib/utils/node'
-import indexer from '@/lib/indexer'
-import { pedersenHash } from '@/lib/lottery/utils/pedersen'
-import { leBigintToBuffer } from '@/lib/lottery/utils/bigint'
 import Header from '@/components/ui/header'
 import Layout from '@/components/ui/Layout'
-import { useLocalStorage } from 'usehooks-ts'
 import { usePlayForm } from '@/hooks/usePlayForm'
+import { LotteryProvider, useLottery } from '@/providers/LotteryProvider'
 
 const playAndPraySchema = z.object({
   prayerText: z.string().min(1, { message: 'You need to enter your prayer' }),
@@ -64,9 +59,7 @@ function PlayForm({ playForm, power, playMutation, handlePlayFormSubmit }) {
             }}
           />
           {power !== undefined && power !== null && !Number.isNaN(power) && (
-            <p className="">
-              =&nbsp;{nFormatter(formatEther(BET_MIN * (2n + 2n ** BigInt(power || 0))))}&nbsp;FOOM
-            </p>
+            <p className="">=&nbsp;{nFormatter(formatEther(BET_MIN * (2n + 2n ** BigInt(power || 0))))}&nbsp;FOOM</p>
           )}
         </div>
       </div>
@@ -124,7 +117,7 @@ function PlayAndPrayForm({ playAndPrayForm, power, playAndPrayMutation, playMuta
         onClick={handlePlayPrayFormSubmit}
         disabled={
           power === undefined ||
-          power === null /** || !playAndPrayEth || !playAndPrayPrayerText */ ||
+          power === null ||
           Number.isNaN(power) ||
           playAndPrayMutation.isPending ||
           playMutation.isPending
@@ -219,188 +212,38 @@ function SwapButton({ swapUsdcToWeth }) {
   )
 }
 
-export default function Home() {
-  const [isClient, setIsClient] = useState(false)
-  const [status, setStatus] = useState('')
-  const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
-  const [redeemHex, setRedeemHex] = useState<string>('')
-  const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
-  const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
-
-  const account = useAppKitAccount()
-  const { data: walletClient } = useWalletClient()
-  const publicClient = usePublicClient()
-
-  const handleStatus = (data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`)
+function HomeContent() {
   const {
-    playForm,
-    playMutation,
-    power,
+    isClient,
+    status,
     commitment,
     setCommitment,
-    handlePlayFormSubmit,
-  } = usePlayForm(handleStatus)
+    tickets,
+    redeemHex,
+    setRedeemHex,
+    playAndPrayMutation,
+    cancelBetMutation,
+    collectRewardMutation,
+    swapUsdcToWeth,
+    handleRedeem,
+    handleStatus,
+  } = useLottery()
+
+  const { playForm, playMutation, power, handlePlayFormSubmit } = usePlayForm(handleStatus)
 
   const playAndPrayForm = useForm<z.infer<typeof playAndPraySchema>>({
     resolver: zodResolver(playAndPraySchema),
   })
-  const { playAndPrayMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({
-    onStatus: handleStatus,
-  })
   const playAndPrayPrayerText = playAndPrayForm.watch('prayerText')
   const playAndPrayEth = playAndPrayForm.watch('prayerEth')
-
   const handlePlayPrayFormSubmit = playAndPrayForm.handleSubmit(({ prayerEth, prayerText }) => {
     _log('submitting a pray:', prayerText, 'for ETH:', prayerEth, 'with power:', power)
-
     playAndPrayMutation.mutate({
       power,
       prayValue: parseEther(prayerEth?.toString() || '0'),
       prayText: prayerText,
     })
   })
-
-  async function swapUsdcToWeth({ amountIn }: { amountIn: bigint; slippage?: number }) {
-    try {
-      if (!walletClient || !account?.address || !publicClient) {
-        setStatus('Wallet not connected')
-        return
-      }
-
-      const allowance: bigint = await publicClient.readContract({
-        address: WETH_BASE,
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [account.address as `0x${string}`, UNISWAP_V3_ROUTER],
-      })
-
-      if (allowance < amountIn) {
-        setStatus('Approving WETH...')
-
-        const approveTx = await walletClient.writeContract({
-          address: WETH_BASE,
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [UNISWAP_V3_ROUTER, amountIn],
-          account: account.address as `0x${string}`,
-        })
-        await publicClient.waitForTransactionReceipt({ hash: approveTx })
-      } else {
-        setStatus('Sufficient WETH allowance, skipping approval.')
-      }
-
-      setStatus('Swapping WETH to FOOM...')
-      const params = {
-        tokenIn: WETH_BASE,
-        tokenOut: FOOM[chain.id],
-        fee: 3000,
-        recipient: account.address as `0x${string}`,
-        amountIn,
-        amountOutMinimum: 0n,
-        sqrtPriceLimitX96: 0n,
-      }
-      const { request } = await publicClient.simulateContract({
-        address: UNISWAP_V3_ROUTER,
-        abi: UNISWAP_V3_ROUTER_ABI,
-        functionName: 'exactInputSingle',
-        args: [params],
-        value: 0n,
-        account: account.address as `0x${string}`,
-      })
-      const swapTx = await walletClient.writeContract(request)
-      await publicClient.waitForTransactionReceipt({ hash: swapTx })
-      setStatus('Swap complete!')
-    } catch (error) {
-      setStatus(`Swap failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      _error('Swap error:', error)
-    }
-  }
-
-  const handleRedeem = async () => {
-    if (!redeemHex) {
-      return
-    }
-
-    try {
-      /** @dev derive the ticket's hash using pedersenHash */
-      const ticketSecret = BigInt(redeemHex)
-
-      /** @dev recover secret and power */
-      const power = ticketSecret & 0xffn
-      const secret = ticketSecret >> 8n
-
-      /** @dev recompute hash */
-      const ticketHash = await pedersenHash(leBigintToBuffer(secret, 31))
-      _log('Ticket hash computed:', ticketHash, `0x${ticketHash.toString(16)}`)
-
-      const { data: startIndex } = await indexer.get('/lottery/start-index', {
-        params: {
-          hash: `0x${ticketHash.toString(16)}`,
-        },
-      })
-
-      collectRewardMutation.mutate({
-        secretPower: ticketSecret,
-        startIndex: startIndex || 0,
-        recipient: account.address as Address,
-        relayer: '0x0',
-        fee: 0n,
-        refund: 0n,
-      })
-    } catch (error) {
-      _error('Failed to fetch startIndex:', error)
-    }
-  }
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  useEffect(() => {
-    if (commitment?.hash) {
-      const hashStr = `0x${commitment?.hash?.toString(16)}`
-
-      if (lotteryHashes.includes(hashStr)) {
-        return
-      }
-
-      setLotteryHashes(prev => {
-        const updated = [...prev, hashStr]
-        localStorage.setItem('lotteryHashes', JSON.stringify(updated))
-
-        return updated
-      })
-    }
-  }, [commitment?.hash, lotteryHashes.length])
-
-  /** Log user's latest hash stored in localstorage on page load. */
-  useEffect(() => {
-    const stored = localStorage.getItem('lotteryHashes')
-    if (stored) {
-      try {
-        const hashes = JSON.parse(stored)
-        setLotteryHashes(hashes)
-      } catch {
-        setLotteryHashes([])
-      }
-    }
-  }, [])
-
-  /** Print user's last hash from the hashes state; NOTE: This should be handled by backend only. */
-  useEffect(() => {
-    if (lotteryHashes.length) {
-      const lastHash = lotteryHashes[lotteryHashes.length - 1]
-      _log('Last hash:', lastHash)
-    }
-  }, [lotteryHashes.length])
-
-  /** NOTE: This should be handled by backend only */
-  useEffect(() => {
-    const stored = localStorage.getItem('commitIndex')
-    if (stored) {
-      setCommitIndex(Number(stored))
-    }
-  }, [])
 
   return (
     <div>
@@ -410,7 +253,6 @@ export default function Home() {
         <div className="flex h-[1em]" />
         <div className="w-full flex items-center justify-start flex-col gap-2">
           <h1 className="text-2xl font-black">FOOM Lottery</h1>
-
           <div className="flex flex-col gap-2 justify-center mt-8 mb-8 min-w-[25%]">
             <PlayForm
               playForm={playForm}
@@ -458,10 +300,17 @@ export default function Home() {
           <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>
         </div>
       </div>
-
       <div className="flex-grow flex items-end justify-center">
         <p>&copy; FOOM AI corporation 2025</p>
       </div>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <LotteryProvider>
+      <HomeContent />
+    </LotteryProvider>
   )
 }
