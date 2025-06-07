@@ -13,6 +13,12 @@ import {
   Footer,
   ReadMoreLink,
 } from '../ui/CyberpunkCardLayout'
+import { useFoomBalance } from '@/hooks/useFoomBalance'
+import { _log, safeToBigint } from '@/lib/utils/ts'
+import SpinnerText from '@/components/shared/spinner-text'
+import { useFoomPrice } from '@/hooks/useFoomPrice'
+import { formatUnits } from 'viem'
+import { nFormatter } from '@/lib/utils/node'
 
 const betMin = 0.1
 
@@ -53,10 +59,22 @@ export default function PlayLottery() {
   const potentialWin = (jackpotLevels[selectedJackpot] * betMin).toFixed(2)
   const odds = tier.odds[selectedJackpot]
 
+  const foomBalanceQuery = useFoomBalance()
+  const foomPriceQuery = useFoomPrice()
+
+  const foomPriceBigint = foomPriceQuery.data ? safeToBigint(foomPriceQuery.data) : undefined
+  const foomBalanceUsd =
+    foomBalanceQuery.data !== undefined && foomPriceBigint !== undefined
+      ? formatUnits(foomBalanceQuery.data * foomPriceBigint.value, 18 + foomPriceBigint.decimals)
+      : undefined
+
   return (
     <CardWrapper>
       <Title>Buy lottery ticket</Title>
-      <Balance>Your Balance: 0.01252 ETH (3123.42$)</Balance>
+      <Balance>
+        Your Balance: {nFormatter(foomBalanceQuery.data) ?? <SpinnerText />} FOOM ($
+        {Number(foomBalanceUsd).toFixed(2) ?? <SpinnerText />})
+      </Balance>
 
       {/* Jackpot selector buttons */}
       <DetailsRow style={{ justifyContent: 'center', marginBottom: '1rem' }}>

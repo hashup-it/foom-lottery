@@ -19,8 +19,8 @@ const _logTable = (headers: string[], values: string[]): void => {
   console.table([tableData])
 }
 
-const _warn = (...msg: any) => console.warn(`\x1b[33m[Warn /!\\]:\x1b[0m`, ...msg)
-const _error = (...msg: any) => console.warn(`\x1b[31m[Error]:\x1b[0m`, ...msg)
+const _warn = (...msg: any) => console.warn(`\x1b[33m[/!\\ Warn]:\x1b[0m`, ...msg)
+const _error = (...msg: any) => console.warn(`\x1b[31m[/!\\ Error]:\x1b[0m`, ...msg)
 
 const parseIntegerSafe = (value: string | number): null | bigint => {
   let result: null | number = null
@@ -35,4 +35,35 @@ const parseIntegerSafe = (value: string | number): null | bigint => {
   return result === null ? null : BigInt(result)
 }
 
-export { _log, _warn, _error, _newLine, parseIntegerSafe, _logTable }
+function safeToBigint(number: string | number | bigint): { value: bigint; decimals: number } {
+  let str = `${number}`
+
+  str = str.trim().toLowerCase()
+  let [base, exp] = str.split('e')
+  const exponent: number = parseInt(exp || '0', 10)
+
+  let [intPart, fracPart = ''] = base.split('.')
+  intPart = intPart.replace(/^0+/, '') || '0'
+  fracPart = fracPart.replace(/0+$/, '')
+
+  let allDigits: string = intPart + fracPart
+  let decimalIndex: number = intPart.length
+  let newDecimalIndex: number = decimalIndex + exponent
+
+  if (newDecimalIndex < 0) {
+    allDigits = allDigits.padStart(allDigits.length + Math.abs(newDecimalIndex), '0')
+    newDecimalIndex = 0
+  } else if (newDecimalIndex > allDigits.length) {
+    allDigits = allDigits.padEnd(newDecimalIndex, '0')
+  }
+
+  const bigintStr: string = allDigits.replace(/^0+/, '') || '0'
+  const decimals: number = Math.max(0, allDigits.length - newDecimalIndex)
+
+  return {
+    value: BigInt(bigintStr),
+    decimals,
+  }
+}
+
+export { _log, _warn, _error, _newLine, parseIntegerSafe, _logTable, safeToBigint }

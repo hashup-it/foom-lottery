@@ -8,15 +8,15 @@ import { cookieStorage, createStorage, http } from '@wagmi/core'
 import { WC_ID } from '@/lib/utils/constants'
 import { _log } from '@/lib/utils/ts'
 import { isDevelopment } from '@/lib/utils/environment'
+import { chain } from '@/lib/utils/constants/addresses'
 
 const queryClient = new QueryClient()
 
 const projectId = WC_ID
-const networks: [AppKitNetwork, ...AppKitNetwork[]] = isDevelopment()
-  ? // ? [sepolia, baseSepolia, mainnet, base]
-    // : [mainnet, base]
-    [foundry]
-  : [base]
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [chain]
+// isDevelopment()
+// ? // ? [sepolia, baseSepolia, mainnet, base]
+// : [mainnet, base]
 
 const metadata: Metadata = {
   name: 'FOOM',

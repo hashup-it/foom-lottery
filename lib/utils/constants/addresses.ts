@@ -15,6 +15,6 @@ const FOOM: { [key: Chain['id']]: Address } = {
   [base.id]: '0x02300aC24838570012027E0A90D3FEcCEF3c51d2',
 }
 
-const chain = isRemote() ? base : foundry
+const chain = isRemote() ? base : base
 
 export { LOTTERY, FOOM, chain }
