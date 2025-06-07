@@ -18,11 +18,11 @@ import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
 import { toast } from 'sonner'
 import { _error, _log } from '@/lib/utils/ts'
 import { chain, FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
-import { foundry } from 'viem/chains'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
 import { generateWithdraw } from '../withdraw'
 import relayerApi from '@/lib/relayer'
+import { useLocalStorage } from 'usehooks-ts'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -48,6 +48,7 @@ export function useLotteryContract({
 } = {}) {
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
+  const [_, setTickets] = useLocalStorage<string[]>('lotteryTickets', [])
 
   /** TODO: make this accept the same as `_log` to enable proper `_log` f call formatting; only just later format params to be concat with spaces and json-stringified if current param is of type `object`. */
   const handleStatus = (data: string) => {
@@ -84,11 +85,12 @@ export function useLotteryContract({
     const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
 
     const ticketStr = commitment.secret_power
-    const storedTickets = JSON.parse(localStorage.getItem('lotteryTickets') || '[]')
-    if (!storedTickets.includes(ticketStr)) {
-      const updatedTickets = [...storedTickets, ticketStr]
-      localStorage.setItem('lotteryTickets', JSON.stringify(updatedTickets))
-    }
+    setTickets(prev => {
+      if (!prev.includes(ticketStr)) {
+        return [...prev, ticketStr]
+      }
+      return prev
+    })
 
     status(`Commitment Hash: ${commitment.hash}`)
     status(`Ticket: ${commitment.secret_power}`)

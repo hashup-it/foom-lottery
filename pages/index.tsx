@@ -23,6 +23,7 @@ import { pedersenHash } from '@/lib/lottery/utils/pedersen'
 import { leBigintToBuffer } from '@/lib/lottery/utils/bigint'
 import Header from '@/components/ui/header'
 import Layout from '@/components/ui/Layout'
+import { useLocalStorage } from 'usehooks-ts'
 
 const playSchema = z.object({
   power: z
@@ -40,9 +41,10 @@ const playAndPraySchema = z.object({
 })
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false)
   const [status, setStatus] = useState('')
   const [commitment, setCommitment] = useState<ICommitment>()
-  const [tickets, setTickets] = useState<string[]>([])
+  const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
   const [redeemHex, setRedeemHex] = useState<string>('')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
@@ -188,32 +190,9 @@ export default function Home() {
   }
 
   useEffect(() => {
-    const stored = localStorage.getItem('lotteryTickets')
-    if (stored) {
-      try {
-        setTickets(JSON.parse(stored))
-      } catch {
-        setTickets([])
-      }
-    }
+    setIsClient(true)
   }, [])
 
-  useEffect(() => {
-    if (commitment?.secret) {
-      const ticketStr = `0x${commitment?.secret?.toString(16)}`
-      setTickets(prev => {
-        if (prev.includes(ticketStr)) {
-          return prev
-        }
-
-        const updated = [...prev, ticketStr]
-        localStorage.setItem('lotteryTickets', JSON.stringify(updated))
-        return updated
-      })
-    }
-  }, [commitment?.secret])
-
-  /** Store the user hashes */
   useEffect(() => {
     if (commitment?.hash) {
       const hashStr = `0x${commitment?.hash?.toString(16)}`
@@ -283,6 +262,7 @@ export default function Home() {
                     type="number"
                     placeholder="FOOM power (integer)"
                     min={0}
+                    defaultValue={0}
                     max={22}
                     step={1}
                     {...playForm.register('power', { valueAsNumber: true, min: 0 })}
@@ -432,10 +412,12 @@ export default function Home() {
           </p>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
-          <p className="w-full break-all whitespace-pre-wrap italic font-bold">
-            Lottery Tickets:{'\n'}
-            {!!tickets.length ? tickets?.map((t, i) => `${i + 1}. ${t}`)?.join('\n') : '<none>'}
-          </p>
+          {isClient && (
+            <p className="w-full break-all whitespace-pre-wrap italic font-bold">
+              Lottery Tickets:{'\n'}
+              {!!tickets.length ? tickets?.map((t, i) => `${i + 1}. ${t}`)?.join('\n') : '<none>'}
+            </p>
+          )}
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>
