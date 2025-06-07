@@ -24,14 +24,7 @@ import { leBigintToBuffer } from '@/lib/lottery/utils/bigint'
 import Header from '@/components/ui/header'
 import Layout from '@/components/ui/Layout'
 import { useLocalStorage } from 'usehooks-ts'
-
-const playSchema = z.object({
-  power: z
-    .number()
-    .int({ message: 'Value must be an integer' })
-    .min(0, { message: 'Value must be at least 0' })
-    .max(31, { message: 'Value must be at most 31' }),
-})
+import { usePlayForm } from '@/hooks/usePlayForm'
 
 const playAndPraySchema = z.object({
   prayerText: z.string().min(1, { message: 'You need to enter your prayer' }),
@@ -229,7 +222,6 @@ function SwapButton({ swapUsdcToWeth }) {
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const [status, setStatus] = useState('')
-  const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
   const [redeemHex, setRedeemHex] = useState<string>('')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
@@ -240,38 +232,23 @@ export default function Home() {
   const publicClient = usePublicClient()
 
   const handleStatus = (data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`)
-  const playForm = useForm<z.infer<typeof playSchema>>({
-    resolver: zodResolver(playSchema),
-  })
+  const {
+    playForm,
+    playMutation,
+    power,
+    commitment,
+    setCommitment,
+    handlePlayFormSubmit,
+  } = usePlayForm(handleStatus)
+
   const playAndPrayForm = useForm<z.infer<typeof playAndPraySchema>>({
     resolver: zodResolver(playAndPraySchema),
   })
-  const { playMutation, playAndPrayMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({
+  const { playAndPrayMutation, cancelBetMutation, collectRewardMutation } = useLotteryContract({
     onStatus: handleStatus,
   })
-  const power = playForm.watch('power')
   const playAndPrayPrayerText = playAndPrayForm.watch('prayerText')
   const playAndPrayEth = playAndPrayForm.watch('prayerEth')
-
-  const handlePlayFormSubmit = playForm.handleSubmit(({ power }) => {
-    playMutation.mutate(
-      { power },
-      {
-        onSuccess: result => {
-          if (result && result.hash) {
-            setCommitment({
-              secret: BigInt(result.secretPower),
-              power: BigInt(power ?? 0),
-              hash: BigInt(result.hash),
-              rand: 0n,
-              index: 0,
-              leaves: [],
-            })
-          }
-        },
-      }
-    )
-  })
 
   const handlePlayPrayFormSubmit = playAndPrayForm.handleSubmit(({ prayerEth, prayerText }) => {
     _log('submitting a pray:', prayerText, 'for ETH:', prayerEth, 'with power:', power)
