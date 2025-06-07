@@ -92,7 +92,7 @@ export default function PlayLottery() {
       <Title>Buy lottery ticket</Title>
       <Balance>
         Your Balance: {nFormatter(foomBalanceQuery.data) ?? <SpinnerText />} FOOM ($
-        {Number(foomBalanceUsd).toFixed(2) ?? <SpinnerText />})
+        {foomBalanceUsd !== undefined ? Number(foomBalanceUsd).toFixed(2) : <SpinnerText />})
       </Balance>
 
       {/* Jackpot selector buttons */}
