@@ -20,7 +20,8 @@ import { useFoomPrice } from '@/hooks/useFoomPrice'
 import { formatUnits } from 'viem'
 import { nFormatter } from '@/lib/utils/node'
 
-const betMin = 0.1
+/** @dev 1 million FOOM ~= 0.10 USD */
+const betMin = 1_000_000
 
 const jackpotLevels = [1024, 65536, 4194304] // Small, Medium, Big
 
@@ -54,11 +55,6 @@ export default function PlayLottery() {
   const [selectedTier, setSelectedTier] = useState(0)
   const [selectedJackpot, setSelectedJackpot] = useState(0) // 0 = small, 1 = medium, 2 = big
 
-  const tier = lotteryTiers[selectedTier]
-  const ticketValue = (tier.price * betMin).toFixed(2)
-  const potentialWin = (jackpotLevels[selectedJackpot] * betMin).toFixed(2)
-  const odds = tier.odds[selectedJackpot]
-
   const foomBalanceQuery = useFoomBalance()
   const foomPriceQuery = useFoomPrice()
 
@@ -67,6 +63,26 @@ export default function PlayLottery() {
     foomBalanceQuery.data !== undefined && foomPriceBigint !== undefined
       ? formatUnits(foomBalanceQuery.data * foomPriceBigint.value, 18 + foomPriceBigint.decimals)
       : undefined
+
+  const getTicketValue = (priceTier: number) => {
+    if (!foomPriceBigint) {
+      return '0.00'
+    }
+    return (
+      Number(formatUnits(BigInt(priceTier) * BigInt(betMin) * foomPriceBigint.value, foomPriceBigint.decimals)).toFixed(
+        2
+      ) || '0.00'
+    )
+  }
+
+  const tier = lotteryTiers[selectedTier]
+  const ticketValue = getTicketValue(tier.price)
+  const potentialWin = (
+    jackpotLevels[selectedJackpot] *
+    betMin *
+    Number(formatUnits(foomPriceBigint?.value || 0n, foomPriceBigint?.decimals || 0))
+  ).toFixed(2)
+  const odds = tier.odds[selectedJackpot]
 
   return (
     <CardWrapper>
@@ -108,7 +124,7 @@ export default function PlayLottery() {
               key={index}
               value={index}
             >
-              Power {index} (Price: ${(tier.price * betMin).toFixed(2)})
+              Power {index} (Price: ${getTicketValue(tier.price)})
             </option>
           ))}
         </InputBox>
