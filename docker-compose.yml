@@ -1,0 +1,10 @@
+services:
+    foom_lottery:
+        container_name: ${CONTAINER_NAME}
+        restart: always
+        build: .
+        environment:
+            - GIT_COMMIT=${GIT_COMMIT}
+            - IS_STAGING=${IS_STAGING}
+        ports:
+            - "${HOST_PORT}:3000"
