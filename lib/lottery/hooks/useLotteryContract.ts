@@ -182,7 +182,7 @@ export function useLotteryContract({
         return await prepareAndPlay({ power, commitmentInput, onStatus })
       } catch (error: any) {
         _error(error)
-        toast(error?.cause?.reason || error?.message || `${error}`)
+        toast(error?.cause?.cause?.code === 4001 ? 'Cancelled' : error?.cause?.reason || error?.message || `${error}`)
         handleStatus(`Error: ${error.message}`)
       }
     },
@@ -237,7 +237,7 @@ export function useLotteryContract({
         })
       } catch (error: any) {
         _error(error)
-        toast(error?.cause?.reason || error?.message || `${error}`)
+        toast(error?.cause?.cause?.code === 4001 ? 'Cancelled' : error?.cause?.reason || error?.message || `${error}`)
         handleStatus(`Error: ${error.message}`)
       }
     },
