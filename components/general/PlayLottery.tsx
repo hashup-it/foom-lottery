@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   CardWrapper,
   Title,
@@ -52,9 +52,43 @@ const lotteryTiers = [
   { price: 4194306, odds: ['1/1024', '1/65536', '1/1'] },
 ]
 
+/**
+ * finds the best tier for a given jackpot index
+ * @param jackpotIndex 1-3
+ * @returns
+ */
+function getBestTierForJackpot(jackpotIndex: number) {
+  let bestTier = 0
+  let bestOdds = Infinity
+  lotteryTiers.forEach((tier, idx) => {
+    const oddsStr = tier.odds[jackpotIndex]
+    const denominator = parseInt(oddsStr.split('/')[1], 10)
+    if (denominator < bestOdds) {
+      bestOdds = denominator
+      bestTier = idx
+    }
+  })
+  return bestTier
+}
+
+function isJackpotButtonHighlighted(index: number, selectedTier: number) {
+  if (index === 0) {
+    return selectedTier <= 10
+  }
+  if (index === 1) {
+    return selectedTier > 10 && selectedTier <= 16
+  }
+  if (index === 2) {
+    return selectedTier > 16
+  }
+  return false
+}
+
 export default function PlayLottery() {
   const [selectedTier, setSelectedTier] = useState(0)
   const [selectedJackpot, setSelectedJackpot] = useState(0) // 0 = small, 1 = medium, 2 = big
+
+  const lottery = useLottery()
 
   const foomBalanceQuery = useFoomBalance()
   const foomPriceQuery = useFoomPrice()
@@ -85,8 +119,6 @@ export default function PlayLottery() {
   ).toFixed(2)
   const odds = tier.odds[selectedJackpot]
 
-  const lottery = useLottery()
-
   return (
     <CardWrapper>
       <Title>Buy lottery ticket</Title>
@@ -100,12 +132,16 @@ export default function PlayLottery() {
         {['Small', 'Medium', 'Big'].map((label, index) => (
           <BuyButton
             key={index}
-            onClick={() => setSelectedJackpot(index)}
+            onClick={() => {
+              setSelectedJackpot(index)
+              setSelectedTier(getBestTierForJackpot(index))
+            }}
             style={{
               width: 'auto',
               fontSize: '1rem',
-              borderColor: selectedJackpot === index ? '#00ffcc' : '#444',
-              background: selectedJackpot === index ? 'rgba(0,255,204,0.15)' : 'transparent',
+              borderColor: isJackpotButtonHighlighted(index, selectedTier) ? '#00ffcc' : '#444',
+              background: isJackpotButtonHighlighted(index, selectedTier) ? 'rgba(0,255,204,0.15)' : 'transparent',
+              color: isJackpotButtonHighlighted(index, selectedTier) ? '#00ffcc' : 'white',
               margin: '0 0.5rem',
             }}
           >
