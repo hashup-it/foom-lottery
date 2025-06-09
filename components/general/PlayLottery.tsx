@@ -121,6 +121,7 @@ export default function PlayLottery() {
 
   return (
     <CardWrapper>
+      {/** TODO: Use ETH instead of FOOM */}
       <Title>Buy lottery ticket</Title>
       <Balance>
         Your Balance: {nFormatter(foomBalanceQuery.data) ?? <SpinnerText />} FOOM ($

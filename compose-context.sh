@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/sh
 
 IS_STAGING=${IS_STAGING:-false}
 
