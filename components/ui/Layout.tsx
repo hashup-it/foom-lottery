@@ -3,6 +3,8 @@ import styled from 'styled-components'
 import PlayLottery from '../general/PlayLottery'
 import CheckTicket from '../general/CheckTicket'
 import { useLocalStorage } from 'usehooks-ts'
+import { useLastPrayers } from '@/hooks/useLastPrayers'
+import { _log } from '@/lib/utils/ts'
 
 const GridContainer = styled.div`
   display: grid;
@@ -59,9 +61,16 @@ const GridContainer = styled.div`
     }
 `
 
+function trimAddress(address: string) {
+  if (!address) return ''
+  return address.slice(0, 6) + '...' + address.slice(-4)
+}
+
 const Layout: React.FC = () => {
   const [isClient, setIsClient] = useState(false)
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
+
+  const lastPrayers = useLastPrayers()
 
   useEffect(() => {
     setIsClient(true)
@@ -77,6 +86,17 @@ const Layout: React.FC = () => {
               <p className="py-2">Your Lottery Tickets:</p>
               <div className="!flex !gap-8 !flex-col text-sm">
                 <p>{!!tickets.length ? tickets?.map((t, i) => `${t}`)?.join('\n') : '<none>'}</p>
+              </div>
+
+              <p className="py-2">Last Prayers:</p>
+              <div className="!flex !gap-8 !flex-col text-sm">
+                <p>
+                  {lastPrayers.data?.data?.length
+                    ? lastPrayers.data.data
+                        .map((prayer, i) => `${trimAddress(prayer.meta.user)}: ${prayer.meta.prayer}`)
+                        .join('\n')
+                    : '<none>'}
+                </p>
               </div>
             </p>
           )}
