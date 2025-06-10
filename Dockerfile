@@ -20,6 +20,11 @@ ENV NODE_ENV=production
 ARG NODE_REMOTE=true
 ENV NODE_REMOTE=true
 
+ARG NEXT_PUBLIC_NODE_ENV=production
+ENV NEXT_PUBLIC_NODE_ENV=production
+ARG NEXT_PUBLIC_NODE_REMOTE=true
+ENV NEXT_PUBLIC_NODE_REMOTE=true
+
 COPY --from=builder /app .
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts && pnpm store prune
 
