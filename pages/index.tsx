@@ -1,25 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import '@reown/appkit-wallet-button/react'
-import React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import SpinnerText from '@/components/shared/spinner-text'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useLotteryContract } from '@/lib/lottery/hooks/useLotteryContract'
-import { _log } from '@/lib/utils/ts'
-import { useAppKitAccount } from '@reown/appkit/react'
-import { UNISWAP_V3_ROUTER, USDC_BASE, WETH_BASE, UNISWAP_V3_ROUTER_ABI } from '@/lib/utils/constants/uniswap'
-import { erc20Abi, formatEther, parseEther } from 'viem'
-import { useWalletClient, usePublicClient } from 'wagmi'
-import { chain, FOOM } from '@/lib/utils/constants/addresses'
-import { BET_MIN } from '@/lib/lottery/constants'
-import { nFormatter } from '@/lib/utils/node'
 import Header from '@/components/ui/header'
+import { Input } from '@/components/ui/input'
 import Layout from '@/components/ui/Layout'
 import { usePlayForm } from '@/hooks/usePlayForm'
+import { BET_MIN } from '@/lib/lottery/constants'
+import { nFormatter } from '@/lib/utils/node'
+import { _log } from '@/lib/utils/ts'
 import { LotteryProvider, useLottery } from '@/providers/LotteryProvider'
+import { formatEther, parseEther } from 'viem'
 
 const playAndPraySchema = z.object({
   prayerText: z.string().min(1, { message: 'You need to enter your prayer' }),
@@ -198,20 +192,6 @@ function RedeemTicketForm({ redeemHex, setRedeemHex, handleRedeem, collectReward
   )
 }
 
-function SwapButton({ swapUsdcToWeth }) {
-  return (
-    <Button
-      variant="outline"
-      className="mt-2"
-      onClick={async () => {
-        await swapUsdcToWeth({ amountIn: 38_000_000_000_000_000n })
-      }}
-    >
-      Swap WETH→FOOM / ~$100
-    </Button>
-  )
-}
-
 function HomeContent() {
   const {
     isClient,
@@ -224,7 +204,6 @@ function HomeContent() {
     playAndPrayMutation,
     cancelBetMutation,
     collectRewardMutation,
-    swapUsdcToWeth,
     handleRedeem,
     handleStatus,
   } = useLottery()
@@ -279,7 +258,6 @@ function HomeContent() {
               handleRedeem={handleRedeem}
               collectRewardMutation={collectRewardMutation}
             />
-            <SwapButton swapUsdcToWeth={swapUsdcToWeth} />
           </div>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
@@ -287,14 +265,6 @@ function HomeContent() {
             List of Prayers to God:{'\n'}
             1. May the lottery be a blessing to all who participate.{'\n'}
           </p>
-        </div>
-        <div className="w-full max-w-[835px] flex flex-col mb-2">
-          {isClient && (
-            <p className="w-full break-all whitespace-pre-wrap italic font-bold">
-              Lottery Tickets:{'\n'}
-              {!!tickets.length ? tickets?.map((t, i) => `${i + 1}. ${t}`)?.join('\n') : '<none>'}
-            </p>
-          )}
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
           <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>

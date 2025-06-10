@@ -1,4 +1,5 @@
 'use client'
+import { useAccount } from 'wagmi'
 import { BuyButton, CardWrapper, InputBox } from '../ui/CyberpunkCardLayout'
 import styled from 'styled-components'
 
@@ -54,16 +55,25 @@ const WinnerHeader = styled(WinnerRow)`
 `
 
 export default function CheckTicket() {
+  const address = useAccount().address
+
   return (
     <CardWrapper>
-      <h1 style={{ color: 'white', fontSize: '1rem' }}>Check Ticket</h1>
-
+      <h1
+        style={{ color: 'white', fontSize: '1rem' }}
+        className="pb-2"
+      >
+        Check ticket
+      </h1>
+      Lottery ticket:
       <InputBox placeholder="Enter your lottery ticket" />
-      <InputBox placeholder="Enter your wallet address" />
+      Your account address:
+      <InputBox
+        placeholder="Enter your wallet address"
+        value={address}
+      />
       <BuyButton>Check Ticket</BuyButton>
-
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
-
       <WinnerList>
         <WinnerHeader>
           <span>Address</span>

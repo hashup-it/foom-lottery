@@ -156,6 +156,7 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     setIsClient(true)
   }, [])
+
   useEffect(() => {
     if (commitment?.hash) {
       const hashStr = `0x${commitment?.hash?.toString(16)}`
