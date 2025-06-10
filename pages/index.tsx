@@ -228,7 +228,7 @@ function HomeContent() {
     <div>
       <Header />
       <Layout />
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen hidden">
         <div className="flex h-[1em]" />
         <div className="w-full flex items-center justify-start flex-col gap-2">
           <h1 className="text-2xl font-black">FOOM Lottery</h1>

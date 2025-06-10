@@ -74,7 +74,7 @@ const Layout: React.FC = () => {
         <div className="w-full max-w-[835px] flex flex-col mb-2">
           {isClient && (
             <p className="w-full break-all whitespace-pre-wrap italic font-bold">
-              <p className='py-2'>Your Lottery Tickets:</p>
+              <p className="py-2">Your Lottery Tickets:</p>
               <div className="!flex !gap-8 !flex-col text-sm">
                 <p>{!!tickets.length ? tickets?.map((t, i) => `${t}`)?.join('\n') : '<none>'}</p>
               </div>
@@ -85,7 +85,7 @@ const Layout: React.FC = () => {
       <div>
         <CheckTicket />
       </div>
-      <div className="full-width">Element 3</div>
+      {/* <div className="full-width">Element 3</div>
       <div className="left">Element 4</div>
       <div>
         <div className="right half">Element 5</div>
@@ -93,7 +93,7 @@ const Layout: React.FC = () => {
       </div>
       <div className="half-left">Element 7</div>
       <div className="half-left">Element 8</div>
-      <div className="half-right">Element 9</div>
+      <div className="half-right">Element 9</div> */}
     </GridContainer>
   )
 }
