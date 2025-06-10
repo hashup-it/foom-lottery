@@ -6,6 +6,7 @@ const isDevelopment = () => !isProduction() && !isStaging()
 /** TODO: Do not use the Vercel variable for foom.cash deployments (vps server) */
 const isRemote = () =>
   process.env.VERCEL === '1' || process.env.FORCE_REMOTE === 'true' || process.env.NODE_REMOTE === 'true'
+_log('Environment:', process.env)
 typeof window === 'undefined'
   ? false
   : (() => {
