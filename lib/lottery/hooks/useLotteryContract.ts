@@ -16,7 +16,7 @@ import { getHash } from '@/lib/lottery/getHash'
 import { getLotteryStatus } from '@/lib/lottery/utils/nextjs/getLotteryStatus'
 import { keccak256Abi, keccak256Uint } from '@/lib/solidity'
 import { toast } from 'sonner'
-import { _error, _log } from '@/lib/utils/ts'
+import { _error, _log, _warn } from '@/lib/utils/ts'
 import { chain, FOOM, LOTTERY } from '@/lib/utils/constants/addresses'
 import { BET_MIN } from '@/lib/lottery/constants'
 import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
@@ -338,6 +338,7 @@ export function useLotteryContract({
     }) => {
       /** @dev proof build */
       /** @dev relayer is always defined as 0x0 to make anyone able to relay this transaction */
+      _log('Generating withdraw proof...')
       const witness = await generateWithdraw({
         secretPowerHex: `0x${secretPower.toString(16)}`,
         startIndexHex: `0x${startIndex.toString(16)}`,
@@ -350,7 +351,7 @@ export function useLotteryContract({
 
       /** @dev Relayer handoff */
       handleStatus('Handing off to relayer...')
-      const response = await relayerApi.post('/relay/withdraw', {
+      const handoffObject = {
         proof: {
           a: witness[0],
           b: witness[1],
@@ -361,9 +362,20 @@ export function useLotteryContract({
         relayer,
         fee: fee.toString(),
         refund: refund.toString(),
-      })
+      }
+      let response: any = undefined
 
-      return response.data
+      try {
+        await relayerApi.post('/relay/withdraw', handoffObject)
+      } catch (error) {
+        _warn(error)
+      }
+
+      _log('Relayer response:', handoffObject)
+      return {
+        input: handoffObject,
+        result: response.data,
+      }
     },
   })
 

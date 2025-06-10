@@ -2,6 +2,10 @@
 import { useAccount } from 'wagmi'
 import { BuyButton, CardWrapper, InputBox } from '../ui/CyberpunkCardLayout'
 import styled from 'styled-components'
+import { useLottery } from '@/providers/LotteryProvider'
+import SpinnerText from '@/components/shared/spinner-text'
+import { useState } from 'react'
+import { _log } from '@/lib/utils/ts'
 
 const mockWinners = [
   { address: '0xA1b2...9D3f', reward: '$102.40', prayer: 'Praise the chain', time: '2 min ago' },
@@ -55,7 +59,27 @@ const WinnerHeader = styled(WinnerRow)`
 `
 
 export default function CheckTicket() {
+  const [hash, setHash] = useState('')
+
   const address = useAccount().address
+
+  const { status, commitment, tickets, redeemHex, setRedeemHex, collectRewardMutation, handleRedeem, handleStatus } =
+    useLottery()
+
+  const handleCheckTicket = async () => {
+    const result = await handleRedeem()
+
+    const hash = result?.hash
+    _log('Redeem result:', result)
+    const proof = result?.proof?.input
+    const relayerResponse = result?.proof?.result
+
+    if (hash) {
+      handleStatus(`Ticket hash: ${hash}`)
+      setHash(hash)
+    }
+    result?.proof ? handleStatus(`Redeem result: ${JSON.stringify(result?.proof, null, 2)}`) : undefined
+  }
 
   return (
     <CardWrapper>
@@ -66,13 +90,29 @@ export default function CheckTicket() {
         Check ticket
       </h1>
       Lottery ticket:
-      <InputBox placeholder="Enter your lottery ticket" />
+      <InputBox
+        placeholder="Enter your lottery ticket"
+        type="text"
+        value={redeemHex}
+        onChange={e => setRedeemHex(e.target.value)}
+        disabled={false}
+      />
       Your account address:
       <InputBox
         placeholder="Enter your wallet address"
         value={address}
       />
-      <BuyButton>Check Ticket</BuyButton>
+      <div>
+        <p>Ticket hash:</p>
+        <p>{hash}</p>
+      </div>
+      <BuyButton
+        className="mt-2 disabled:!cursor-not-allowed"
+        disabled={!redeemHex}
+        onClick={handleCheckTicket}
+      >
+        {collectRewardMutation.isPending ? <SpinnerText /> : 'Check Ticket'}
+      </BuyButton>
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
       <WinnerList>
         <WinnerHeader>

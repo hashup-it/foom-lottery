@@ -84,9 +84,18 @@ export async function generateWithdraw({
 
   const [betIndex, betRand, nextIndex] = await findBetFromApi(hash_power1, startindex)
 
-  _log('results', betIndex, betRand, `(0x${BigInt(betRand).toString(16)})`, nextIndex)
+  _log('results', {
+    betIndex,
+    betRand,
+    nextIndex,
+    hash_power1: bigintToHexRaw(hash_power1),
+    startindex: startindex.toString(16),
+  })
 
   if (betIndex > 0 && betRand == 0n) {
+    const message = `Bet with hash ${bigintToHexRaw(hash)} is still being processed. Please wait.`
+    _warn(message)
+    toast(message)
     throw 'bet not processed yet for ' + bigintToHex(hash_power1) + ' starting at ' + startindex.toString(16)
   }
   if (betIndex == 0) {

@@ -5,6 +5,7 @@ import CheckTicket from '../general/CheckTicket'
 import { useLocalStorage } from 'usehooks-ts'
 import { useLastPrayers } from '@/hooks/useLastPrayers'
 import { _log } from '@/lib/utils/ts'
+import { useLottery } from '@/providers/LotteryProvider'
 
 const GridContainer = styled.div`
   display: grid;
@@ -71,6 +72,7 @@ const Layout: React.FC = () => {
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
 
   const lastPrayers = useLastPrayers()
+  const lottery = useLottery()
 
   useEffect(() => {
     setIsClient(true)
@@ -104,6 +106,7 @@ const Layout: React.FC = () => {
       </div>
       <div>
         <CheckTicket />
+        {lottery.status}
       </div>
       {/* <div className="full-width">Element 3</div>
       <div className="left">Element 4</div>

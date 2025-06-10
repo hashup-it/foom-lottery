@@ -36,7 +36,13 @@ interface LotteryContextValue {
   collectRewardMutation: ReturnType<typeof useLotteryContract>['collectRewardMutation']
   playMutation: ReturnType<typeof useLotteryContract>['playMutation']
   swapUsdcToWeth: (args: { amountIn: bigint; slippage?: number }) => Promise<void>
-  handleRedeem: () => Promise<void>
+  handleRedeem: () => Promise<
+    | {
+        hash: string
+        proof: any
+      }
+    | undefined
+  >
   play: (args: PlayArgs) => void
   handleStatus: (data: string) => void
 }
@@ -130,17 +136,25 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   )
 
   const handleRedeem = useCallback(async () => {
-    if (!redeemHex) return
+    if (!redeemHex) {
+      return
+    }
+
+    let ticketHashHex = ''
+    let result: any = undefined
     try {
       const ticketSecret = BigInt(redeemHex)
       const power = ticketSecret & 0xffn
       const secret = ticketSecret >> 8n
       const ticketHash = await pedersenHash(leBigintToBuffer(secret, 31))
-      _log('Ticket hash computed:', ticketHash, `0x${ticketHash.toString(16)}`)
+
+      ticketHashHex = `0x${ticketHash.toString(16)}`
+      _log('Ticket hash computed:', ticketHash, ticketHashHex)
+
       const { data: startIndex } = await indexer.get('/lottery/start-index', {
         params: { hash: `0x${ticketHash.toString(16)}` },
       })
-      collectRewardMutation.mutate({
+      const mutationResult = collectRewardMutation.mutate({
         secretPower: ticketSecret,
         startIndex: startIndex || 0,
         recipient: account.address as Address,
@@ -148,8 +162,15 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fee: 0n,
         refund: 0n,
       })
+      _log('after mutation',mutationResult)
+      result = mutationResult
     } catch (error) {
       _error('Failed to fetch startIndex:', error)
+    }
+
+    return {
+      hash: ticketHashHex,
+      proof: result,
     }
   }, [redeemHex, collectRewardMutation, account])
 
