@@ -28,6 +28,8 @@ const Balance = styled.div`
   padding: 0.3rem 0.8rem;
   width: fit-content;
   margin-bottom: 1rem;
+  display: flex;
+  text-align: start;
 `
 
 const InputBox = styled.input`

@@ -21,6 +21,7 @@ import { formatUnits } from 'viem'
 import { nFormatter } from '@/lib/utils/node'
 import { useLottery } from '@/providers/LotteryProvider'
 import styled from 'styled-components'
+import { usePublicClient, useAccount, useBalance } from 'wagmi'
 
 const SliderWrapper = styled.div`
   width: 300px;
@@ -161,6 +162,9 @@ export default function PlayLottery() {
 
   const value = steps[stepIndex] || 0
 
+  const { address } = useAccount()
+  const { data: ethBalanceData } = useBalance({ address })
+
   useEffect(() => {
     const idx = getPricesByTier(currentTicket).indexOf(value)
     if (idx !== -1) setSelectedTier(idx + tierRanges[selectedJackpot].start)
@@ -193,9 +197,12 @@ export default function PlayLottery() {
     <CardWrapper>
       {/** TODO: Use ETH instead of FOOM */}
       <Title>Buy lottery ticket</Title>
-      <Balance>
-        Your Balance: {nFormatter(foomBalanceQuery.data) ?? <SpinnerText />} FOOM ($
-        {foomBalanceUsd !== undefined ? Number(foomBalanceUsd).toFixed(2) : <SpinnerText />})
+      <Balance className="flex flex-col">
+        <p>
+          Your Balance: {nFormatter(foomBalanceQuery.data) ?? <SpinnerText />} FOOM ($
+          {foomBalanceUsd !== undefined ? Number(foomBalanceUsd).toFixed(2) : <SpinnerText />})
+        </p>
+        <p>Your ETH Balance: {ethBalanceData ? `${ethBalanceData.formatted} ETH` : <SpinnerText />}</p>
       </Balance>
 
       <DetailsRow style={{ justifyContent: 'center', marginBottom: '1rem' }}>
@@ -222,7 +229,7 @@ export default function PlayLottery() {
       </DetailsRow>
 
       <StyledSlider
-      className='mb-2'
+        className="mb-2"
         min={0}
         max={steps.length - 1}
         value={stepIndex}

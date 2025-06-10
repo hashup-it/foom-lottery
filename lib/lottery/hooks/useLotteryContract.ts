@@ -68,9 +68,10 @@ export function useLotteryContract({
     customArgs?: Record<string, any>
   }) {
     const multiplier = 2n + 2n ** BigInt(power ?? 0)
-    const playAmount = BET_MIN * multiplier
+    const playAmount_ = BET_MIN * multiplier
+    const playAmount = playAmount_ + (playAmount_ >> 0n)
 
-    _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} FOOM`)
+    _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} ETH`)
 
     if (!walletClient || !publicClient) {
       throw new Error('Wallet not connected')
@@ -95,70 +96,30 @@ export function useLotteryContract({
     status(`Commitment Hash: ${commitment.hash}`)
     status(`Ticket: ${commitment.secret_power}`)
 
-    const foomBalance = await publicClient.readContract({
-      address: FOOM[chain.id],
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [walletClient.account.address],
-    })
-    status(`FOOM Balance: ${foomBalance}`)
-
-    const currentAllowance = await publicClient.readContract({
-      address: FOOM[chain.id],
-      abi: erc20Abi,
-      functionName: 'allowance',
-      args: [walletClient.account.address, LOTTERY[chain.id]],
-    })
-    status(`Current FOOM Allowance: ${currentAllowance}, needed FOOM allowance: ${playAmount}`)
-
-    let receipt: any = undefined
-
-    status(`Playing with FOOM tokens...`)
-    if (currentAllowance < playAmount) {
-      const { request: approveRequest } = await publicClient.simulateContract({
-        address: FOOM[chain.id],
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [LOTTERY[chain.id], playAmount],
-        account: walletClient.account.address,
-      })
-      const approveTx = await walletClient.writeContract(approveRequest)
-      await waitForTransactionReceipt(publicClient, { hash: approveTx })
-      let updatedAllowance = await publicClient.readContract({
-        address: FOOM[chain.id],
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [walletClient.account.address, LOTTERY[chain.id]],
-      })
-      status(`Updated FOOM Allowance: ${updatedAllowance}`)
-      if (updatedAllowance < playAmount) {
-        throw new Error('Updated allowance still insufficient.')
-      }
-    } else {
-      status('Sufficient allowance, skipping approval.')
-    }
-
     const correctNonce = await publicClient.getTransactionCount({
       address: walletClient.account.address,
     })
     _log('Nonce:', correctNonce)
 
-    const { request: playRequest } = await publicClient.simulateContract({
+    const args = {
       address: LOTTERY[chain.id],
       abi: EthLotteryAbi,
-      functionName: customArgs.functionName || 'play',
-      args: [commitment.hash, BigInt(power), ...(customArgs.args ?? [])],
+      functionName: 'playETH',
+      args: [BigInt(commitment.hash), BigInt(power)],
       account: walletClient.account.address,
-      nonce: correctNonce,
-      ...(customArgs.value !== undefined ? { value: customArgs.value } : {}),
-    })
+      value: playAmount,
+    }
+    _log('Args:', args)
+    const result = await publicClient.simulateContract(args)
+    const { request: playRequest } = result
+    _log('result:', result)
     _log('past simulation, request:', playRequest)
 
     const playTx = await walletClient.writeContract({
       ...playRequest,
-      ...(customArgs.value !== undefined ? { value: customArgs.value } : {}),
+      value: playAmount,
     })
-    receipt = await waitForTransactionReceipt(publicClient, { hash: playTx })
+    const receipt = await waitForTransactionReceipt(publicClient, { hash: playTx })
 
     const secret = BigInt(commitment.secret_power) >> 8n
     const lastLeaf = await fetchLastLeaf()

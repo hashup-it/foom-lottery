@@ -106,7 +106,7 @@ const Layout: React.FC = () => {
       </div>
       <div>
         <CheckTicket />
-        {lottery.status}
+        <div className="mt-4 flex flex-wrap break-all whitespace-pre-wrap">{lottery.status}</div>
       </div>
       {/* <div className="full-width">Element 3</div>
       <div className="left">Element 4</div>

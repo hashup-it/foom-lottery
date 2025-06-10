@@ -68,7 +68,7 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
 
-  const handleStatus = useCallback((data: string) => setStatus(prev => `${prev}${prev ? '\n\n' : '\n'}> ${data}`), [])
+  const handleStatus = useCallback((data: string) => setStatus(prev => `> ${data}${prev ? '\n\n' + prev : ''}`), [])
   const { playAndPrayMutation, cancelBetMutation, collectRewardMutation, playMutation } = useLotteryContract({
     onStatus: handleStatus,
   })
