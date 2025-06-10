@@ -1,17 +1,17 @@
 'use client'
 import { useEffect, useState } from 'react'
 import {
-    CardWrapper,
-    Title,
-    Balance,
-    InputBox,
-    DetailsRow,
-    InfoBlock,
-    Label,
-    Value,
-    BuyButton,
-    Footer,
-    ReadMoreLink,
+  CardWrapper,
+  Title,
+  Balance,
+  InputBox,
+  DetailsRow,
+  InfoBlock,
+  Label,
+  Value,
+  BuyButton,
+  Footer,
+  ReadMoreLink,
 } from '../ui/CyberpunkCardLayout'
 import { useFoomBalance } from '@/hooks/useFoomBalance'
 import { _log, safeToBigint } from '@/lib/utils/ts'
@@ -62,7 +62,7 @@ const StyledSlider = styled.input.attrs({ type: 'range' })`
     background-color: #ccc;
     border-radius: 2px;
   }
-`; 
+`
 
 const Labels = styled.div`
   display: flex;
@@ -114,7 +114,7 @@ const tierRanges = {
   2: { start: 17, end: 22 },
 }
 
-const getPricesByTier = (tierName) => {
+const getPricesByTier = tierName => {
   const tierMap = { Small: 0, Medium: 1, Big: 2 }
   const tierIndex = tierMap[tierName]
   const { start, end } = tierRanges[tierIndex]
@@ -122,7 +122,8 @@ const getPricesByTier = (tierName) => {
 }
 
 function getBestTierForJackpot(jackpotIndex) {
-  let bestTier = 0, bestOdds = Infinity
+  let bestTier = 0,
+    bestOdds = Infinity
   lotteryTiers.forEach((tier, idx) => {
     const oddsStr = tier.odds[jackpotIndex]
     const denominator = parseInt(oddsStr.split('/')[1])
@@ -153,9 +154,10 @@ export default function PlayLottery() {
   const foomPriceQuery = useFoomPrice()
   const foomPriceBigint = foomPriceQuery.data ? safeToBigint(foomPriceQuery.data) : undefined
 
-  const foomBalanceUsd = foomBalanceQuery.data !== undefined && foomPriceBigint !== undefined
-    ? formatUnits(foomBalanceQuery.data * foomPriceBigint.value, 18 + foomPriceBigint.decimals)
-    : undefined
+  const foomBalanceUsd =
+    foomBalanceQuery.data !== undefined && foomPriceBigint !== undefined
+      ? formatUnits(foomBalanceQuery.data * foomPriceBigint.value, 18 + foomPriceBigint.decimals)
+      : undefined
 
   const value = steps[stepIndex] || 0
 
@@ -164,24 +166,26 @@ export default function PlayLottery() {
     if (idx !== -1) setSelectedTier(idx + tierRanges[selectedJackpot].start)
   }, [stepIndex])
 
-  const handleTicketChange = (ticket) => {
+  const handleTicketChange = ticket => {
     setCurrentTicket(ticket)
     const prices = getPricesByTier(ticket)
     setSteps(prices)
     setStepIndex(0)
   }
 
-  const getTicketValue = (priceTier) => {
+  const getTicketValue = priceTier => {
     if (!foomPriceBigint) return '0.00'
-    return (
-      Number(formatUnits(BigInt(priceTier) * BigInt(betMin) * foomPriceBigint.value, foomPriceBigint.decimals)).toFixed(2)
-    )
+    return Number(
+      formatUnits(BigInt(priceTier) * BigInt(betMin) * foomPriceBigint.value, foomPriceBigint.decimals)
+    ).toFixed(2)
   }
 
   const tier = lotteryTiers[selectedTier]
   const ticketValue = getTicketValue(tier.price)
   const potentialWin = (
-    jackpotLevels[selectedJackpot] * betMin * Number(formatUnits(foomPriceBigint?.value || 0n, foomPriceBigint?.decimals || 0))
+    jackpotLevels[selectedJackpot] *
+    betMin *
+    Number(formatUnits(foomPriceBigint?.value || 0n, foomPriceBigint?.decimals || 0))
   ).toFixed(2)
   const odds = tier.odds[selectedJackpot]
 
@@ -218,6 +222,7 @@ export default function PlayLottery() {
       </DetailsRow>
 
       <StyledSlider
+      className='mb-2'
         min={0}
         max={steps.length - 1}
         value={stepIndex}
@@ -225,7 +230,7 @@ export default function PlayLottery() {
         onChange={e => setStepIndex(parseInt(e.target.value))}
       />
 
-      {/* <ValueLabel>Price: {value}</ValueLabel> */} 
+      {/* <ValueLabel>Price: {value}</ValueLabel> */}
 
       {/* <label style={{ color: 'white', fontSize: '0.5rem' }}>
         Select power:
@@ -260,11 +265,11 @@ export default function PlayLottery() {
       <BuyButton
         disabled={lottery.playMutation.isPending}
         className="disabled:opacity-50 disabled:cursor-not-allowed"
-        onClick={(() => {
-            lottery.play({ power: selectedTier })
-            console.log(selectedTier)
-            // lottery.play({ power: selectedTier, price: value }) 
-        })} 
+        onClick={() => {
+          lottery.play({ power: selectedTier })
+          console.log(selectedTier)
+          // lottery.play({ power: selectedTier, price: value })
+        }}
       >
         {lottery.playMutation.isPending ? <SpinnerText /> : 'Buy lottery Ticket'}
       </BuyButton>
@@ -275,4 +280,3 @@ export default function PlayLottery() {
     </CardWrapper>
   )
 }
-  
