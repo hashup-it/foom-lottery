@@ -3,6 +3,7 @@ WORKDIR /app
 
 RUN npm install -g pnpm@9.15.5
 COPY package.json pnpm-lock.yaml ./
+COPY .env ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
