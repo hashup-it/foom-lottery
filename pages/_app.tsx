@@ -29,8 +29,6 @@ function App({ Component, pageProps }: IAppProps) {
     setIsDebug(localStorage?.getItem('isDebug') === 'true')
   }, [])
 
-  _log('isRemote:', isRemote())
-
   return (
     <BackgroundWrapper>
       <GlobalStyles />
