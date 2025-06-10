@@ -14,7 +14,10 @@ WORKDIR /app
 
 RUN npm install -g pnpm@9.15.5
 
+ARG NODE_ENV=production
 ENV NODE_ENV=production
+ARG NODE_REMOTE=true
+ENV NODE_REMOTE=true
 
 COPY --from=builder /app .
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts && pnpm store prune
