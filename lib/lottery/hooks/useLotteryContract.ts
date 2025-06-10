@@ -56,6 +56,16 @@ export function useLotteryContract({
     onStatus?.(data)
   }
 
+  function getAmountEthForPower(power: number | bigint): bigint {
+    const betMin = BET_MIN
+
+    if (power > 22) {
+      throw new Error('Invalid bet amount')
+    }
+
+    return betMin * (2n + 2n ** BigInt(power)) * 100000n
+  }
+
   async function prepareAndPlay({
     power,
     commitmentInput = 0,
@@ -68,8 +78,7 @@ export function useLotteryContract({
     customArgs?: Record<string, any>
   }) {
     const multiplier = 2n + 2n ** BigInt(power ?? 0)
-    const playAmount_ = BET_MIN * multiplier
-    const playAmount = playAmount_ + (playAmount_ >> 0n)
+    const playAmount = getAmountEthForPower(power)
 
     _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} ETH`)
 
