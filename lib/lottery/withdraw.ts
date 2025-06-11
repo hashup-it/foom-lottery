@@ -27,12 +27,11 @@ type BetResponse = [number, bigint, number]
 // MIMC tree Element[]
 type PathResponse = bigint[]
 
-async function findBetFromApi(hash: bigint, startIndex: number): Promise<BetResponse> {
+async function findBetFromApi(hash: bigint, startIndex?: number /** @deprecated auto-detected from the bet hash */): Promise<BetResponse> {
   try {
-    const response: AxiosResponse<BetResponse> = await indexer.get('/lottery/leaf', {
+    const response: AxiosResponse<BetResponse> = await indexer.get('/lottery/leaf-pro', {
       params: {
         hash: bigintToHex(hash),
-        startIndex: startIndex.toString(16),
       },
     })
 
@@ -59,7 +58,6 @@ async function getPathFromApi(betIndex: number, nextIndex: number): Promise<bigi
 
 export async function generateWithdraw({
   secretPowerHex,
-  startIndexHex,
   recipientHex,
   relayerHex,
   feeHex,
@@ -67,7 +65,6 @@ export async function generateWithdraw({
   handleStatus,
 }: {
   secretPowerHex: string
-  startIndexHex: string
   recipientHex: string
   relayerHex: string
   feeHex: string
@@ -80,28 +77,31 @@ export async function generateWithdraw({
   const power = secret_power & 0x1fn
   const hash = await pedersenHash(leBigintToBuffer(secret, 31))
   const hash_power1 = hash + power + 1n
-  const startindex = Number(startIndexHex)
 
-  const [betIndex, betRand, nextIndex] = await findBetFromApi(hash_power1, startindex)
+  const [betIndex, betRand, nextIndex] = await findBetFromApi(hash_power1)
+  _log('Bet found:', {
+    betIndex,
+    betRand,
+    nextIndex,
+  })
 
   _log('results', {
     betIndex,
     betRand,
     nextIndex,
     hash_power1: bigintToHexRaw(hash_power1),
-    startindex: startindex.toString(16),
   })
 
   if (betIndex > 0 && betRand == 0n) {
     const message = `Bet with hash ${bigintToHexRaw(hash)} is still being processed. Please wait.`
     _warn(message)
     toast(message)
-    throw 'bet not processed yet for ' + bigintToHex(hash_power1) + ' starting at ' + startindex.toString(16)
+    throw 'bet not processed yet for ' + bigintToHex(hash_power1)
   }
   if (betIndex == 0) {
     toast(`Your bet was not found!`)
     _warn(`Bet with hash ${bigintToHexRaw(hash)} not found`)
-    throw 'bet not found for ' + bigintToHex(hash_power1) + ' starting at ' + startindex.toString(16)
+    throw 'bet not found for ' + bigintToHex(hash_power1)
   }
 
   const bigindex = BigInt(betIndex)
@@ -116,10 +116,10 @@ export async function generateWithdraw({
     power <= power1
       ? ((2n ** (power1 + power2 + power3 + 1n) - 1n) << power) & (2n ** (power1 + power2 + power3 + 1n) - 1n)
       : power <= power2
-      ? (((2n ** (power2 + power3 + 1n) - 1n) << (power + power1)) | (2n ** power1 - 1n)) &
-        (2n ** (power1 + power2 + power3 + 1n) - 1n)
-      : (((2n ** (power3 + 1n) - 1n) << (power + power1 + power2)) | (2n ** (power1 + power2) - 1n)) &
-        (2n ** (power1 + power2 + power3 + 1n) - 1n)
+        ? (((2n ** (power2 + power3 + 1n) - 1n) << (power + power1)) | (2n ** power1 - 1n)) &
+          (2n ** (power1 + power2 + power3 + 1n) - 1n)
+        : (((2n ** (power3 + 1n) - 1n) << (power + power1 + power2)) | (2n ** (power1 + power2) - 1n)) &
+          (2n ** (power1 + power2 + power3 + 1n) - 1n)
   const maskdice = mask & dice
   const rew1 = maskdice & 0b1111111111n ? 0n : 1n
   const rew2 = maskdice & 0b11111111111111110000000000n ? 0n : 1n
@@ -166,7 +166,7 @@ export async function generateWithdraw({
   const pA = proof.pi_a.slice(0, 2).map(BigInt) as [bigint, bigint]
   const pB = proof.pi_b.slice(0, 2).map((arr: string[]) => arr.slice(0, 2).map(BigInt) as [bigint, bigint]) as [
     [bigint, bigint],
-    [bigint, bigint]
+    [bigint, bigint],
   ]
   const pC = proof.pi_c.slice(0, 2).map(BigInt) as [bigint, bigint]
 

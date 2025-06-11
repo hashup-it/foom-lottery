@@ -151,12 +151,8 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ticketHashHex = `0x${ticketHash.toString(16)}`
       _log('Ticket hash computed:', ticketHash, ticketHashHex)
 
-      const { data: startIndex } = await indexer.get('/lottery/start-index', {
-        params: { hash: `0x${ticketHash.toString(16)}` },
-      })
       const mutationResult = collectRewardMutation.mutate({
         secretPower: ticketSecret,
-        startIndex: startIndex || 0,
         recipient: account.address as Address,
         relayer: '0x0',
         fee: 0n,

@@ -63,7 +63,7 @@ export function useLotteryContract({
       throw new Error('Invalid bet amount')
     }
 
-    return betMin * (2n + 2n ** BigInt(power)) * 100000n
+    return betMin * (2n + 2n ** BigInt(power)) + 200000000000000n
   }
 
   async function prepareAndPlay({
@@ -131,7 +131,10 @@ export function useLotteryContract({
     const receipt = await waitForTransactionReceipt(publicClient, { hash: playTx })
 
     const secret = BigInt(commitment.secret_power) >> 8n
+
+    /** @dev TBD: Is this needed here? */
     const lastLeaf = await fetchLastLeaf()
+
     status(
       `Ticket: ${commitment.secret_power}, Next Index: ${lastLeaf[0]}, block number: ${lastLeaf[1]}, Amount: ${multiplier}`
     )
@@ -293,14 +296,12 @@ export function useLotteryContract({
   const collectRewardMutation = useMutation({
     mutationFn: async ({
       secretPower,
-      startIndex,
       recipient,
       relayer,
       fee = 0n,
       refund = 0n,
     }: {
       secretPower: bigint
-      startIndex: number
       recipient: string
       relayer: string
       fee?: bigint
@@ -311,7 +312,6 @@ export function useLotteryContract({
       _log('Generating withdraw proof...')
       const witness = await generateWithdraw({
         secretPowerHex: `0x${secretPower.toString(16)}`,
-        startIndexHex: `0x${startIndex.toString(16)}`,
         recipientHex: recipient,
         relayerHex: relayer || '0x0',
         feeHex: `0x${fee.toString(16)}`,
