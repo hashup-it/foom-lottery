@@ -57,7 +57,7 @@ export function useLottery() {
 
 export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isClient, setIsClient] = useState(false)
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useLocalStorage<string>('lotteryStatus', '')
   const [commitment, setCommitment] = useState<ICommitment>()
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
   const [redeemHex, setRedeemHex] = useState<string>('')

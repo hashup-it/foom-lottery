@@ -267,7 +267,7 @@ function HomeContent() {
           </p>
         </div>
         <div className="w-full max-w-[835px] flex flex-col mb-2">
-          <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p>
+          {/* <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p> */}
         </div>
       </div>
       <div className="flex-grow flex items-end justify-center">
