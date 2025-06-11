@@ -1,12 +1,15 @@
 'use client'
-import { useAccount } from 'wagmi'
+import { useAccount, useWalletClient, usePublicClient } from 'wagmi'
 import { BuyButton, CardWrapper, InputBox } from '../ui/CyberpunkCardLayout'
 import styled from 'styled-components'
 import { useLottery } from '@/providers/LotteryProvider'
 import SpinnerText from '@/components/shared/spinner-text'
 import { useState } from 'react'
-import { _log } from '@/lib/utils/ts'
-import type { Hex } from 'viem'
+import { _error, _log } from '@/lib/utils/ts'
+import { zeroAddress, type Hex } from 'viem'
+import { EthLotteryAbi } from '@/abis/eth-lottery'
+import { LOTTERY, chain } from '@/lib/utils/constants/addresses'
+import { useMutation } from '@tanstack/react-query'
 
 const mockWinners = [
   { address: '0xA1b2...9D3f', reward: '$102.40', prayer: 'Praise the chain', time: '2 min ago' },
@@ -80,6 +83,8 @@ export default function CheckTicket() {
   }>()
 
   const address = useAccount().address
+  const { data: walletClient } = useWalletClient()
+  const publicClient = usePublicClient()
 
   const { status, commitment, tickets, redeemHex, setRedeemHex, collectRewardMutation, handleRedeem, handleStatus } =
     useLottery()
@@ -97,15 +102,91 @@ export default function CheckTicket() {
       handleStatus(`Ticket hash: ${hash}`)
 
       setHash(hash)
-      setWitness(result.proof)
+      setWitness(result.proof.witness)
     }
 
     result?.proof ? handleStatus(`Redeem result: ${JSON.stringify(result?.proof, null, 2)}`) : undefined
   }
 
-  const handleCollectRewardManually = async () => {
-    // call the foomlottery contract's collect() function.
-  }
+  const collectManuallyMutation = useMutation({
+    mutationFn: async () => {
+      if (!walletClient || !publicClient) {
+        throw new Error('Wallet not connected')
+      }
+      if (!witness || !witness.raw || !address) {
+        throw new Error('Missing witness or address')
+      }
+
+      const { pi_a, pi_b, pi_c } = witness.raw.proof
+      const { pathElements, nullifierHash, rewardbits, recipientHex, relayerHex, feeHex, refundHex } = witness.raw
+
+      // GenerateWitness.js reference:
+      //
+      // const input = {
+      //   root: pathElements[32],
+      //   nullifierHash: nullifierHash,
+      //   rewardbits: rewardbits,
+      //   recipient: hexToBigint(recipientHex),
+      //   relayer: hexToBigint(relayerHex),
+      //   fee: hexToBigint(feeHex),
+      //   refund: hexToBigint(refundHex),
+      //   secret: secret,
+      //   power: power,
+      //   rand: betRand,
+      //   pathIndex: BigInt(betIndex),
+      //   pathElements: pathElements.slice(0, 32),
+      // }
+      //
+      // =================================================================
+      //
+      // name: 'collect',
+      // inputs: [
+      //   { name: '_pA', type: 'uint256[2]', internalType: 'uint256[2]' },
+      //   { name: '_pB', type: 'uint256[2][2]', internalType: 'uint256[2][2]' },
+      //   { name: '_pC', type: 'uint256[2]', internalType: 'uint256[2]' },
+      //   { name: '_root', type: 'uint256', internalType: 'uint256' },
+      //   { name: '_nullifierHash', type: 'uint256', internalType: 'uint256' },
+      //   { name: '_recipient', type: 'address', internalType: 'address' },
+      //   { name: '_relayer', type: 'address', internalType: 'address' },
+      //   { name: '_fee', type: 'uint256', internalType: 'uint256' },
+      //   { name: '_refund', type: 'uint256', internalType: 'uint256' },
+      //   { name: '_rewardbits', type: 'uint256', internalType: 'uint256' },
+      //   { name: '_invest', type: 'uint256', internalType: 'uint256' },
+      // ],
+
+      const args = [
+        pi_a, // uint256[2]
+        pi_b, // uint256[2][2]
+        pi_c, // uint256[2]
+        BigInt(pathElements[32]), // _root: uint256
+        BigInt(nullifierHash), // _nullifierHash: uint256
+        recipientHex, // _recipient: address
+        relayerHex, // _relayer: address
+        BigInt(feeHex), // _fee: uint256
+        BigInt(refundHex), // _refund: uint256
+        BigInt(rewardbits), // _rewardbits: uint256
+        0n, // _invest: uint256
+      ]
+      const { request } = await publicClient.simulateContract({
+        address: LOTTERY[chain.id],
+        abi: EthLotteryAbi,
+        functionName: 'collect',
+        args,
+        value: 0n,
+        account: address,
+      })
+
+      const tx = await walletClient.writeContract(request)
+      handleStatus(`Collect tx sent: ${tx}`)
+
+      await publicClient.waitForTransactionReceipt({ hash: tx })
+      handleStatus('Reward collected!')
+    },
+    onError: error => {
+      _error(error)
+      handleStatus(`Collect failed: ${error instanceof Error ? error.message : String(error)}`)
+    },
+  })
 
   return (
     <CardWrapper>
@@ -144,9 +225,10 @@ export default function CheckTicket() {
       {!!witness && (
         <BuyButton
           className="mt-2 disabled:!cursor-not-allowed"
-          onClick={handleCollectRewardManually}
+          onClick={() => collectManuallyMutation.mutate()}
+          disabled={collectManuallyMutation.isPending}
         >
-          {'Collect the reward yourself (no relayers available!)'}
+          {collectManuallyMutation.isPending ? <SpinnerText /> : 'Collect the reward yourself (no relayers available!)'}
         </BuyButton>
       )}
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
@@ -170,3 +252,6 @@ export default function CheckTicket() {
     </CardWrapper>
   )
 }
+
+const parseRelayer = (relayer: string) =>
+  !relayer || relayer === '0x0' || Number(relayer) === 0 ? zeroAddress : relayer

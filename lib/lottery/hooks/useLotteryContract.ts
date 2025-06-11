@@ -9,6 +9,7 @@ import {
   erc20Abi,
   formatEther,
   decodeEventLog,
+  zeroAddress,
 } from 'viem'
 import { waitForTransactionReceipt } from 'viem/actions'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
@@ -126,7 +127,7 @@ export function useLotteryContract({
     const lastLeaf = await fetchLastLeaf()
 
     status(
-      `Ticket: ${commitment.secret_power}, Next Index: ${lastLeaf[0]}, block number: ${lastLeaf[1]}, Amount: ${multiplier}`
+      `Ticket: ${commitment.secret_power}, Next Index: ${lastLeaf[0]}, block number: ${lastLeaf[1]}, Power: ${power}`
     )
 
     return {
@@ -295,6 +296,7 @@ export function useLotteryContract({
 
   /**
    * Solely calls proof generation.
+   * AKA generate witness/proof (and store it for further use)
    */
   const collectRewardMutation = useMutation({
     mutationFn: async ({
@@ -316,7 +318,8 @@ export function useLotteryContract({
       const witness = await generateWithdraw({
         secretPowerHex: `0x${secretPower.toString(16)}`,
         recipientHex: recipient,
-        relayerHex: relayer || '0x0',
+        /** @dev this is always set to 0x0 (not string!) to allow anyone to relay */
+        relayerHex: zeroAddress,
         feeHex: `0x${fee.toString(16)}`,
         refundHex: `0x${refund.toString(16)}`,
         handleStatus,
