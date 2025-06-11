@@ -23,6 +23,7 @@ import { fetchLastLeaf } from '@/lib/lottery/fetchLastLeaf'
 import { generateWithdraw } from '../withdraw'
 import relayerApi from '@/lib/relayer'
 import { useLocalStorage } from 'usehooks-ts'
+import type { AxiosResponse } from 'axios'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -63,7 +64,9 @@ export function useLotteryContract({
       throw new Error('Invalid bet amount')
     }
 
-    return betMin * (2n + 2n ** BigInt(power)) + 200000000000000n
+    const amount = (betMin * (2n + 2n ** BigInt(power))) * 1400n
+    _log('Playing for:', formatEther(amount), 'ETH')
+    return amount
   }
 
   async function prepareAndPlay({
@@ -293,6 +296,9 @@ export function useLotteryContract({
     },
   })
 
+  /**
+   * Solely calls proof generation.
+   */
   const collectRewardMutation = useMutation({
     mutationFn: async ({
       secretPower,
@@ -309,7 +315,7 @@ export function useLotteryContract({
     }) => {
       /** @dev proof build */
       /** @dev relayer is always defined as 0x0 to make anyone able to relay this transaction */
-      _log('Generating withdraw proof...')
+      _log('Generating withdraw proof…')
       const witness = await generateWithdraw({
         secretPowerHex: `0x${secretPower.toString(16)}`,
         recipientHex: recipient,
@@ -320,31 +326,20 @@ export function useLotteryContract({
       })
 
       /** @dev Relayer handoff */
-      handleStatus('Handing off to relayer...')
-      const handoffObject = {
-        proof: {
-          a: witness[0],
-          b: witness[1],
-          c: witness[2],
-        },
-        inputs: witness[3],
-        recipient,
-        relayer,
-        fee: fee.toString(),
-        refund: refund.toString(),
-      }
-      let response: any = undefined
+      handleStatus('Handing off to chosen relayer…')
+      const handoffObject = witness.encoded
+      let response: AxiosResponse<any, any> | undefined = undefined
 
       try {
-        await relayerApi.post('/relay/withdraw', handoffObject)
+        response = await relayerApi.post('/relay/withdraw', handoffObject)
       } catch (error) {
         _warn(error)
       }
 
-      _log('Relayer response:', handoffObject)
+      _log('Relayer API response:', '<no API picked for `collect()` call>')
       return {
-        input: handoffObject,
-        result: response.data,
+        witness,
+        result: response?.data,
       }
     },
   })

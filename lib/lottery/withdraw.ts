@@ -27,7 +27,10 @@ type BetResponse = [number, bigint, number]
 // MIMC tree Element[]
 type PathResponse = bigint[]
 
-async function findBetFromApi(hash: bigint, startIndex?: number /** @deprecated auto-detected from the bet hash */): Promise<BetResponse> {
+async function findBetFromApi(
+  hash: bigint,
+  startIndex?: number /** @deprecated auto-detected from the bet hash */
+): Promise<BetResponse> {
   try {
     const response: AxiosResponse<BetResponse> = await indexer.get('/lottery/leaf-pro', {
       params: {
@@ -106,7 +109,6 @@ export async function generateWithdraw({
 
   const bigindex = BigInt(betIndex)
 
-  _log('bigindex:', bigindex)
   const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret, betRand, bigindex])))
 
   const power1 = 10n
@@ -129,7 +131,6 @@ export async function generateWithdraw({
   const terces = reverseBits(dice, 31 * 8)
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31))
 
-  _log('getting:', betIndex, nextIndex)
   const pathElements = await getPathFromApi(betIndex, nextIndex)
 
   const hexPathElements = pathElements.map(el => `0x${BigInt(`${el}`).toString(16)}`)
@@ -192,5 +193,21 @@ export async function generateWithdraw({
   )
 
   handleStatus?.(`Encoded witness: ${witness}`)
-  return witness
+  return {
+    encoded: witness,
+    raw: {
+      pathElements,
+      nullifierHash,
+      rewardbits,
+      recipientHex,
+      relayerHex,
+      feeHex,
+      refundHex,
+      proof: {
+        pi_a: pA,
+        pi_b: pB,
+        pi_c: pC,
+      },
+    },
+  }
 }

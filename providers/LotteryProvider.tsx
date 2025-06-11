@@ -151,14 +151,13 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ticketHashHex = `0x${ticketHash.toString(16)}`
       _log('Ticket hash computed:', ticketHash, ticketHashHex)
 
-      const mutationResult = collectRewardMutation.mutate({
+      const mutationResult = await collectRewardMutation.mutateAsync({
         secretPower: ticketSecret,
         recipient: account.address as Address,
         relayer: '0x0',
         fee: 0n,
         refund: 0n,
       })
-      _log('after mutation',mutationResult)
       result = mutationResult
     } catch (error) {
       _error('Failed to fetch startIndex:', error)

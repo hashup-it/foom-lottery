@@ -6,6 +6,7 @@ import { useLottery } from '@/providers/LotteryProvider'
 import SpinnerText from '@/components/shared/spinner-text'
 import { useState } from 'react'
 import { _log } from '@/lib/utils/ts'
+import type { Hex } from 'viem'
 
 const mockWinners = [
   { address: '0xA1b2...9D3f', reward: '$102.40', prayer: 'Praise the chain', time: '2 min ago' },
@@ -60,6 +61,23 @@ const WinnerHeader = styled(WinnerRow)`
 
 export default function CheckTicket() {
   const [hash, setHash] = useState('')
+  const [witness, setWitness] = useState<{
+    encoded: `0x${string}`
+    raw: {
+      pathElements: bigint[]
+      nullifierHash: bigint
+      rewardbits: bigint
+      recipientHex: string
+      relayerHex: string
+      feeHex: string
+      refundHex: string
+      proof: {
+        pi_a: any[]
+        pi_b: any[]
+        pi_c: any[]
+      }
+    }
+  }>()
 
   const address = useAccount().address
 
@@ -70,6 +88,7 @@ export default function CheckTicket() {
     const result = await handleRedeem()
 
     const hash = result?.hash
+
     _log('Redeem result:', result)
     const proof = result?.proof?.input
     const relayerResponse = result?.proof?.result
@@ -79,6 +98,10 @@ export default function CheckTicket() {
       setHash(hash)
     }
     result?.proof ? handleStatus(`Redeem result: ${JSON.stringify(result?.proof, null, 2)}`) : undefined
+  }
+
+  const handleCollectRewardManually = async () => {
+    // call the foomlottery contract's collect() function.
   }
 
   return (
@@ -112,6 +135,12 @@ export default function CheckTicket() {
         onClick={handleCheckTicket}
       >
         {collectRewardMutation.isPending ? <SpinnerText /> : 'Check Ticket'}
+      </BuyButton>
+      <BuyButton
+        className="mt-2 disabled:!cursor-not-allowed"
+        onClick={handleCollectRewardManually}
+      >
+        {'Collect the reward yourself (no relayers available)'}
       </BuyButton>
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
       <WinnerList>
