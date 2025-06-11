@@ -274,7 +274,6 @@ export default function PlayLottery() {
         className="disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => {
           lottery.play({ power: selectedTier })
-          console.log(selectedTier)
           // lottery.play({ power: selectedTier, price: value })
         }}
       >

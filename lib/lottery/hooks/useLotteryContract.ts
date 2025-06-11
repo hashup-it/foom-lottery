@@ -24,6 +24,7 @@ import { generateWithdraw } from '../withdraw'
 import relayerApi from '@/lib/relayer'
 import { useLocalStorage } from 'usehooks-ts'
 import type { AxiosResponse } from 'axios'
+import { UNISWAP_V3_QUOTER, UNISWAP_V3_QUOTER_ABI, WETH_BASE } from '@/lib/utils/constants/uniswap'
 
 export type FormattedProof = {
   pi_a: [bigint, bigint]
@@ -57,18 +58,6 @@ export function useLotteryContract({
     onStatus?.(data)
   }
 
-  function getAmountEthForPower(power: number | bigint): bigint {
-    const betMin = BET_MIN
-
-    if (power > 22) {
-      throw new Error('Invalid bet amount')
-    }
-
-    const amount = (betMin * (2n + 2n ** BigInt(power))) * 1400n
-    _log('Playing for:', formatEther(amount), 'ETH')
-    return amount
-  }
-
   async function prepareAndPlay({
     power,
     commitmentInput = 0,
@@ -80,19 +69,17 @@ export function useLotteryContract({
     onStatus?: (msg: string) => void
     customArgs?: Record<string, any>
   }) {
-    const multiplier = 2n + 2n ** BigInt(power ?? 0)
-    const playAmount = getAmountEthForPower(power)
-
-    _log('Playing with:', formatEther(multiplier), '* bet_min', `= ${formatEther(playAmount)} ETH`)
+    const status = (msg: string) => {
+      _log(msg)
+      onStatus?.(msg)
+    }
 
     if (!walletClient || !publicClient) {
       throw new Error('Wallet not connected')
     }
 
-    const status = (msg: string) => {
-      _log(msg)
-      onStatus?.(msg)
-    }
+    const playAmount = await getAmountEthForPower(power)
+    _log('Playing with:', '<uniswap return value>', '* bet_min', `= ${formatEther(playAmount)} ETH`)
 
     status('Generating commitment...')
     const commitment = await getHash([`0x${Number(power).toString(16)}`, commitmentInput])
@@ -158,7 +145,17 @@ export function useLotteryContract({
         return await prepareAndPlay({ power, commitmentInput, onStatus })
       } catch (error: any) {
         _error(error)
-        toast(error?.cause?.cause?.code === 4001 ? 'Cancelled' : error?.cause?.reason || error?.message || `${error}`)
+
+        if (error?.cause?.cause?.code === 4001) {
+          toast('Cancelled')
+        } else if (error?.cause?.cause?.name === 'InsufficientFundsError') {
+          toast(
+            `You don't have enough ETH to play! (you need ${formatEther(await getAmountEthForPower(power))} ETH + gas fees)`
+          )
+        } else {
+          toast('There is not enough liquidity in the pool to play this bet. Please, try again later.')
+        }
+
         handleStatus(`Error: ${error.message}`)
       }
     },
@@ -343,6 +340,51 @@ export function useLotteryContract({
       }
     },
   })
+
+  async function getEthInForFoomOut(amountOut: bigint): Promise<bigint> {
+    if (!publicClient) {
+      throw new Error('No public client')
+    }
+
+    const result = await publicClient.readContract({
+      address: UNISWAP_V3_QUOTER,
+      abi: UNISWAP_V3_QUOTER_ABI,
+      functionName: 'quoteExactOutputSingle',
+      args: [
+        {
+          tokenIn: WETH_BASE,
+          tokenOut: FOOM[chain.id],
+          amount: amountOut,
+          fee: 3000n,
+          sqrtPriceLimitX96: 0n,
+        },
+      ],
+    })
+
+    if (!Array.isArray(result) || typeof result?.[0] !== 'bigint') {
+      throw new Error('Unexpected result from Uniswap Quoter')
+    }
+
+    _log('Uniswap V3 quote result:', result)
+    return result[0]
+  }
+
+  /**
+   * Calculates amount of ETH to deposit for the play of given power to happen.
+   * @dev yields >= the amount of ETH that swaps to enough FOOMs via Uniswap V3
+   */
+  async function getAmountEthForPower(power: number | bigint): Promise<bigint> {
+    if (power > 22) {
+      throw new Error('Invalid bet amount')
+    }
+
+    const amountFoomNeeded = BET_MIN * (2n + 2n ** BigInt(power))
+    const amountEthNeeded = await getEthInForFoomOut(amountFoomNeeded)
+    /** @dev 3% buffer to add to avoid underflow */
+    const amount = amountEthNeeded + (amountEthNeeded * 3n) / 100n
+
+    return amount
+  }
 
   return {
     playMutation,
