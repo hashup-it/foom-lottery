@@ -95,8 +95,11 @@ export default function CheckTicket() {
 
     if (hash) {
       handleStatus(`Ticket hash: ${hash}`)
+
       setHash(hash)
+      setWitness(result.proof)
     }
+
     result?.proof ? handleStatus(`Redeem result: ${JSON.stringify(result?.proof, null, 2)}`) : undefined
   }
 
@@ -125,10 +128,12 @@ export default function CheckTicket() {
         placeholder="Enter your wallet address"
         value={address}
       />
-      <div>
-        <p>Ticket hash:</p>
-        <p>{hash}</p>
-      </div>
+      {!!hash && (
+        <div>
+          <p>Ticket hash:</p>
+          <p>{hash}</p>
+        </div>
+      )}
       <BuyButton
         className="mt-2 disabled:!cursor-not-allowed"
         disabled={!redeemHex}
@@ -136,12 +141,14 @@ export default function CheckTicket() {
       >
         {collectRewardMutation.isPending ? <SpinnerText /> : 'Check Ticket'}
       </BuyButton>
-      <BuyButton
-        className="mt-2 disabled:!cursor-not-allowed"
-        onClick={handleCollectRewardManually}
-      >
-        {'Collect the reward yourself (no relayers available)'}
-      </BuyButton>
+      {!!witness && (
+        <BuyButton
+          className="mt-2 disabled:!cursor-not-allowed"
+          onClick={handleCollectRewardManually}
+        >
+          {'Collect the reward yourself (no relayers available!)'}
+        </BuyButton>
+      )}
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
       <WinnerList>
         <WinnerHeader>
