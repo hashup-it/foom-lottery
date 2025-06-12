@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import foomApi from '@/lib/foomApi'
 import { isRemote } from '@/lib/utils/environment'
 import { _warn } from '@/lib/utils/ts'
+import indexer from '@/lib/indexer'
 
 const FOOM_PRICE_DEFAULT = 9.42021586255562e-8
 
@@ -14,7 +15,7 @@ export function useFoomPrice() {
         return FOOM_PRICE_DEFAULT
       }
       try {
-        const res = await foomApi.get('/stats/price')
+        const res = await indexer.get('/api/price')
         return res.data.foomPrice
       } catch (error) {
         _warn('Error fetching FOOM price, returning default', error)
