@@ -5,6 +5,7 @@ services:
         build: .
         environment:
             - GIT_COMMIT=${GIT_COMMIT}
+            - NEXT_PUBLIC_GIT_COMMIT=${GIT_COMMIT}
             - IS_STAGING=${IS_STAGING}
         ports:
             - "${HOST_PORT}:3000"
