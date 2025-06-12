@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "NODE_OPTIONS='--inspect' next dev --turbopack",
-    "build": "dotenv -e $(if [ \"$IS_STAGING\" = \"true\" ]; then echo .env.staging; else echo .env; fi) -- next build",
-    "start": "dotenv -e $(if [ \"$IS_STAGING\" = \"true\" ]; then echo .env.staging; else echo .env; fi) -- next start",
+    "build": "NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT dotenv -e $(if [ \"$IS_STAGING\" = \"true\" ]; then echo .env.staging; else echo .env; fi) -- next build",
+    "start": "NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT dotenv -e $(if [ \"$IS_STAGING\" = \"true\" ]; then echo .env.staging; else echo .env; fi) -- next start",
     "lint": "next lint"
   },
   "dependencies": {

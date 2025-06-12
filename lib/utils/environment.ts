@@ -16,6 +16,7 @@ _log('Environment:', {
   NEXT_PUBLIC_CONTROLLER_API: process.env.NEXT_PUBLIC_CONTROLLER_API,
   NEXT_PUBLIC_RELAYER_API: process.env.NEXT_PUBLIC_RELAYER_API,
   NEXT_PUBLIC_IS_REMOTE: process.env.NEXT_PUBLIC_IS_REMOTE,
+  NEXT_PUBLIC_GIT_COMMIT: process.env.NEXT_PUBLIC_GIT_COMMIT,
 })
 
 typeof window === 'undefined'

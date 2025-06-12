@@ -25,6 +25,10 @@ ENV NEXT_PUBLIC_NODE_ENV=production
 ARG NEXT_PUBLIC_NODE_REMOTE=true
 ENV NEXT_PUBLIC_NODE_REMOTE=true
 
+ARG GIT_COMMIT
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
+
 COPY --from=builder /app .
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts && pnpm store prune
 
