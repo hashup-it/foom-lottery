@@ -7,7 +7,7 @@ import { pedersenHash } from '@/lib/lottery/utils/pedersen'
 import { leBigintToBuffer } from '@/lib/lottery/utils/bigint'
 import indexer from '@/lib/indexer'
 import { _log, _error } from '@/lib/utils/ts'
-import type { Address } from 'viem'
+import type { Address, Hex } from 'viem'
 import type { ICommitment } from '@/types/lottery'
 import { chain, FOOM } from '@/lib/utils/constants/addresses'
 import { erc20Abi } from 'viem'
@@ -45,6 +45,8 @@ interface LotteryContextValue {
   >
   play: (args: PlayArgs) => void
   handleStatus: (data: string) => void
+  recipient: Hex | undefined
+  setRecipient: React.Dispatch<React.SetStateAction<Hex | undefined>>
 }
 
 const LotteryContext = createContext<LotteryContextValue | undefined>(undefined)
@@ -59,6 +61,7 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isClient, setIsClient] = useState(false)
   const [status, setStatus] = useLocalStorage<string>('lotteryStatus', '')
   const [commitment, setCommitment] = useState<ICommitment>()
+  const [recipient, setRecipient] = useState<Hex>()
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
   const [redeemHex, setRedeemHex] = useState<string>('')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
@@ -151,9 +154,11 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ticketHashHex = `0x${ticketHash.toString(16)}`
       _log('Ticket hash computed:', ticketHash, ticketHashHex)
 
+      const collector = recipient || (account?.address as Address)
+      _log('Using recipient for proof:', collector)
       const mutationResult = await collectRewardMutation.mutateAsync({
         secretPower: ticketSecret,
-        recipient: account.address as Address,
+        recipient: collector,
         relayer: '0x0',
         fee: 0n,
         refund: 0n,
@@ -232,6 +237,8 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
     handleRedeem,
     play,
     handleStatus,
+    recipient,
+    setRecipient,
   }
 
   return <LotteryContext.Provider value={value}>{children}</LotteryContext.Provider>

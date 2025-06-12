@@ -4,9 +4,9 @@ import { BuyButton, CardWrapper, InputBox } from '../ui/CyberpunkCardLayout'
 import styled from 'styled-components'
 import { useLottery } from '@/providers/LotteryProvider'
 import SpinnerText from '@/components/shared/spinner-text'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { _error, _log } from '@/lib/utils/ts'
-import { zeroAddress, type Hex } from 'viem'
+import { zeroAddress, type Address, type Hex } from 'viem'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { LOTTERY, chain } from '@/lib/utils/constants/addresses'
 import { useMutation } from '@tanstack/react-query'
@@ -86,8 +86,18 @@ export default function CheckTicket() {
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()
 
-  const { status, commitment, tickets, redeemHex, setRedeemHex, collectRewardMutation, handleRedeem, handleStatus } =
-    useLottery()
+  const {
+    status,
+    commitment,
+    tickets,
+    redeemHex,
+    setRedeemHex,
+    collectRewardMutation,
+    handleRedeem,
+    handleStatus,
+    recipient,
+    setRecipient,
+  } = useLottery()
 
   const handleCheckTicket = async () => {
     const result = await handleRedeem()
@@ -167,6 +177,7 @@ export default function CheckTicket() {
         BigInt(rewardbits), // _rewardbits: uint256
         0n, // _invest: uint256
       ]
+      _log('Collect args:', args)
       const { request } = await publicClient.simulateContract({
         address: LOTTERY[chain.id],
         abi: EthLotteryAbi,
@@ -188,6 +199,15 @@ export default function CheckTicket() {
     },
   })
 
+  /** @dev init recipient */
+  useEffect(() => {
+    if (!address || !!recipient) {
+      return
+    }
+
+    setRecipient(address)
+  }, [address])
+
   return (
     <CardWrapper>
       <h1
@@ -207,7 +227,8 @@ export default function CheckTicket() {
       Your account address:
       <InputBox
         placeholder="Enter your wallet address"
-        value={address}
+        value={recipient || ''}
+        onChange={e => setRecipient(e?.target?.value as Address)}
       />
       {!!hash && (
         <div>
@@ -223,12 +244,18 @@ export default function CheckTicket() {
         {collectRewardMutation.isPending ? <SpinnerText /> : 'Check Ticket'}
       </BuyButton>
       {!!witness && (
+        <div className="mt-2">
+          <p>Reward bits:</p>
+          <p>{witness?.raw?.rewardbits}</p>
+        </div>
+      )}
+      {!!witness && (
         <BuyButton
           className="mt-2 disabled:!cursor-not-allowed"
           onClick={() => collectManuallyMutation.mutate()}
           disabled={collectManuallyMutation.isPending}
         >
-          {collectManuallyMutation.isPending ? <SpinnerText /> : 'Collect the reward yourself (no relayers available!)'}
+          {collectManuallyMutation.isPending ? <SpinnerText /> : 'Collect the reward'}
         </BuyButton>
       )}
       <h2 style={{ color: 'white', marginTop: '1.5rem' }}>Last Lottery Winners:</h2>
