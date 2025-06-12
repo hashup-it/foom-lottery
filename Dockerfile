@@ -4,6 +4,7 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.5
 COPY package.json pnpm-lock.yaml ./
 COPY .env ./
+
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -27,8 +28,6 @@ ENV NEXT_PUBLIC_NODE_REMOTE=true
 
 ARG GIT_COMMIT
 ENV GIT_COMMIT=$GIT_COMMIT
-ARG NEXT_PUBLIC_GIT_COMMIT
-ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
 
 COPY --from=builder /app .
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts && pnpm store prune
