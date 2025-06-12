@@ -6,10 +6,11 @@ import { useLottery } from '@/providers/LotteryProvider'
 import SpinnerText from '@/components/shared/spinner-text'
 import { useEffect, useState } from 'react'
 import { _error, _log } from '@/lib/utils/ts'
-import { zeroAddress, type Address, type Hex } from 'viem'
+import { decodeAbiParameters, zeroAddress, type Address, type Hex, Address } from 'viem'
 import { EthLotteryAbi } from '@/abis/eth-lottery'
 import { LOTTERY, chain } from '@/lib/utils/constants/addresses'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 const mockWinners = [
   { address: '0xA1b2...9D3f', reward: '$102.40', prayer: 'Praise the chain', time: '2 min ago' },
@@ -105,6 +106,7 @@ export default function CheckTicket() {
     const hash = result?.hash
 
     _log('Redeem result:', result)
+    _log('Proof as hex:', JSON.stringify(result?.proof?.witness?.raw?.proof, null, 2))
     const proof = result?.proof?.input
     const relayerResponse = result?.proof?.result
 
@@ -126,9 +128,6 @@ export default function CheckTicket() {
       if (!witness || !witness.raw || !address) {
         throw new Error('Missing witness or address')
       }
-
-      const { pi_a, pi_b, pi_c } = witness.raw.proof
-      const { pathElements, nullifierHash, rewardbits, recipientHex, relayerHex, feeHex, refundHex } = witness.raw
 
       // GenerateWitness.js reference:
       //
@@ -163,28 +162,36 @@ export default function CheckTicket() {
       //   { name: '_rewardbits', type: 'uint256', internalType: 'uint256' },
       //   { name: '_invest', type: 'uint256', internalType: 'uint256' },
       // ],
+      const d = decodeAbiParameters(
+        [{ type: 'uint256[2]' }, { type: 'uint256[2][2]' }, { type: 'uint256[2]' }, { type: 'uint256[7]' }],
+        witness.encoded
+      )
+      const relayer = d[3][3] === 0n ? '0x0000000000000000000000000000000000000000' : d[3][3].toString(16)
+      _log('Decoded witness:', d)
 
       const args = [
-        pi_a, // uint256[2]
-        pi_b, // uint256[2][2]
-        pi_c, // uint256[2]
-        BigInt(pathElements[32]), // _root: uint256
-        BigInt(nullifierHash), // _nullifierHash: uint256
-        recipientHex, // _recipient: address
-        relayerHex, // _relayer: address
-        BigInt(feeHex), // _fee: uint256
-        BigInt(refundHex), // _refund: uint256
-        BigInt(rewardbits), // _rewardbits: uint256
-        0n, // _invest: uint256
+        d[0],
+        d[1],
+        d[2],
+        d[3][0],
+        d[3][1],
+        `0x${relayer}` /** recipient */,
+        zeroAddress /** relayer */,
+        d[3][4],
+        d[3][5],
+        d[3][6],
+        0n,
       ]
       _log('Collect args:', args)
+
+      // const gasPrice = await publicClient.getGasPrice()
       const { request } = await publicClient.simulateContract({
         address: LOTTERY[chain.id],
         abi: EthLotteryAbi,
         functionName: 'collect',
         args,
-        value: 0n,
         account: address,
+        // gasPrice: (gasPrice * 110n) / 100n,
       })
 
       const tx = await walletClient.writeContract(request)
@@ -195,6 +202,17 @@ export default function CheckTicket() {
     },
     onError: error => {
       _error(error)
+      _error({ ...error })
+
+      /** @dev if gas fee error */
+      if ((error?.cause as any)?.cause?.name === 'InsufficientFundsError') {
+        toast('Gas fee is insufficient for your transaction, please try again')
+      }
+      /** @dev if reward already collected */
+      if ((error?.cause as any)?.reason === 'Incorrect nullifier') {
+        toast('This reward was already collected before!')
+      }
+
       handleStatus(`Collect failed: ${error instanceof Error ? error.message : String(error)}`)
     },
   })

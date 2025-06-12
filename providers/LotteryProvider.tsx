@@ -63,7 +63,7 @@ export const LotteryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [commitment, setCommitment] = useState<ICommitment>()
   const [recipient, setRecipient] = useState<Hex>()
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
-  const [redeemHex, setRedeemHex] = useState<string>('')
+  const [redeemHex, setRedeemHex] = useState<string>(process.env.NEXT_PUBLIC_TEMP_TICKET || '')
   const [lotteryHashes, setLotteryHashes] = useState<string[]>([])
   const [commitIndex, setCommitIndex] = useState<number>(lotteryHashes.length)
 
