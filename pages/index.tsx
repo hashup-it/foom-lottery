@@ -14,6 +14,8 @@ import { nFormatter } from '@/lib/utils/node'
 import { _log } from '@/lib/utils/ts'
 import { LotteryProvider, useLottery } from '@/providers/LotteryProvider'
 import { formatEther, parseEther } from 'viem'
+import Link from 'next/link'
+import { toast } from 'sonner'
 
 const playAndPraySchema = z.object({
   prayerText: z.string().min(1, { message: 'You need to enter your prayer' }),
@@ -270,8 +272,15 @@ function HomeContent() {
           {/* <p className="w-full break-all whitespace-pre-wrap">Status:{status || '\n<none>'}</p> */}
         </div>
       </div>
-      <div className="flex-grow flex items-end justify-center">
-        <p>&copy; FOOM AI corporation 2025</p>
+      <div className="flex-grow flex items-center justify-end flex-col mt-4">
+        <Link
+          href={`https://github.com/hashup-it/foom-lottery/commit/${process.env.NEXT_PUBLIC_GIT_COMMIT}/`}
+          target="_blank"
+          className="text-xs opacity-70 hover:underline active:underline"
+        >
+          rev. {process.env.NEXT_PUBLIC_GIT_COMMIT}
+        </Link>
+        <p className='mb-4'>&copy; FOOM AI corporation 2025</p>
       </div>
     </div>
   )
