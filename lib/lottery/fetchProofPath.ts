@@ -1,6 +1,6 @@
 import indexer from '@/lib/indexer'
 
-export const fetchProofPath = async (index: number, nextIndex?: number) => {
+export const fetchProofPath = async (index: number, nextIndex?: number): Promise<bigint[]> => {
   const response = await indexer.get('/lottery/proof-path', {
     params: {
       index,

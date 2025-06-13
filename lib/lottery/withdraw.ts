@@ -16,6 +16,7 @@ import { AxiosResponse } from 'axios'
 import { _log, _warn } from '@/lib/utils/ts'
 import { toast } from 'sonner'
 import { encodeAbiParameters, hexToBigInt } from 'viem'
+import { fetchProofPath } from '@/lib/lottery/fetchProofPath'
 
 // {
 //   betIndex: number
@@ -42,20 +43,6 @@ async function findBetFromApi(
     return result
   } catch (error: any) {
     throw new Error(`Error fetching bet: ${error.message}`)
-  }
-}
-
-async function getPathFromApi(betIndex: number, nextIndex: number): Promise<bigint[]> {
-  try {
-    const response: AxiosResponse<PathResponse> = await indexer.get('/lottery/proof-path', {
-      params: {
-        index: betIndex,
-        nextIndex: nextIndex,
-      },
-    })
-    return response.data
-  } catch (error: any) {
-    throw new Error(`Error fetching path: ${error.message}`)
   }
 }
 
@@ -131,7 +118,7 @@ export async function generateWithdraw({
   const terces = reverseBits(dice, 31 * 8)
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31))
 
-  const pathElements = await getPathFromApi(betIndex, nextIndex)
+  const pathElements = await fetchProofPath(betIndex, nextIndex)
 
   const hexPathElements = pathElements.map(el => `0x${BigInt(`${el}`).toString(16)}`)
   handleStatus?.(`Path elements: ${JSON.stringify(hexPathElements, null, 2)}`)
