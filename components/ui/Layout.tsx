@@ -67,9 +67,12 @@ function trimAddress(address: string) {
   return address.slice(0, 6) + '...' + address.slice(-4)
 }
 
+const STATUS_PAGE_SIZE = 10;
+
 const Layout: React.FC = () => {
   const [isClient, setIsClient] = useState(false)
   const [tickets] = useLocalStorage<string[]>('lotteryTickets', [])
+  const [statusPage, setStatusPage] = useState(1)
 
   const lastPrayers = useLastPrayers()
   const lottery = useLottery()
@@ -77,6 +80,17 @@ const Layout: React.FC = () => {
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  let statusLines: string[] = [];
+  if (isClient) {
+    if (typeof lottery.status === 'string') {
+      statusLines = lottery.status.split('\n');
+    } else if (Array.isArray(lottery.status)) {
+      statusLines = lottery.status;
+    }
+  }
+  const visibleStatusLines = statusLines.slice(0, statusPage * STATUS_PAGE_SIZE);
+  const hasMoreStatus = statusLines.length > visibleStatusLines.length;
 
   return (
     <GridContainer>
@@ -107,7 +121,17 @@ const Layout: React.FC = () => {
       <div>
         <CheckTicket />
         <div className="mt-4 flex flex-wrap break-all whitespace-pre-wrap text-start">
-          {isClient ? lottery.status : undefined}
+          {isClient && Array.isArray(visibleStatusLines) && visibleStatusLines.map((line, idx) => (
+            <div key={idx}>{line}</div>
+          ))}
+          {hasMoreStatus && (
+            <button
+              className="mt-2 px-4 py-1 bg-gray-700 text-white rounded hover:bg-gray-600"
+              onClick={() => setStatusPage((p) => p + 1)}
+            >
+              Show More
+            </button>
+          )}
         </div>
       </div>
       {/* <div className="full-width">Element 3</div>
