@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import styled from 'styled-components'
 import PlayLottery from '../general/PlayLottery'
 import CheckTicket from '../general/CheckTicket'
@@ -67,7 +67,7 @@ function trimAddress(address: string) {
   return address.slice(0, 6) + '...' + address.slice(-4)
 }
 
-const STATUS_PAGE_SIZE = 10;
+const STATUS_PAGE_SIZE = 10
 
 const Layout: React.FC = () => {
   const [isClient, setIsClient] = useState(false)
@@ -81,16 +81,16 @@ const Layout: React.FC = () => {
     setIsClient(true)
   }, [])
 
-  let statusLines: string[] = [];
+  let statusLines: string[] = []
   if (isClient) {
     if (typeof lottery.status === 'string') {
-      statusLines = lottery.status.split('\n');
+      statusLines = lottery.status.split('\n')
     } else if (Array.isArray(lottery.status)) {
-      statusLines = lottery.status;
+      statusLines = lottery.status
     }
   }
-  const visibleStatusLines = statusLines.slice(0, statusPage * STATUS_PAGE_SIZE);
-  const hasMoreStatus = statusLines.length > visibleStatusLines.length;
+  const visibleStatusLines = statusLines.slice(0, statusPage * STATUS_PAGE_SIZE)
+  const hasMoreStatus = statusLines.length > visibleStatusLines.length
 
   return (
     <GridContainer>
@@ -120,14 +120,14 @@ const Layout: React.FC = () => {
       </div>
       <div>
         <CheckTicket />
-        <div className="mt-4 flex flex-wrap break-all whitespace-pre-wrap text-start">
-          {isClient && Array.isArray(visibleStatusLines) && visibleStatusLines.map((line, idx) => (
-            <div key={idx}>{line}</div>
-          ))}
+        <div className="mt-4 flex flex-col flex-wrap break-all whitespace-pre-wrap text-start">
+          {isClient &&
+            Array.isArray(visibleStatusLines) &&
+            visibleStatusLines.map((line, idx) => <div key={idx}>{`${line}\n`}</div>)}
           {hasMoreStatus && (
             <button
               className="mt-2 px-4 py-1 bg-gray-700 text-white rounded hover:bg-gray-600"
-              onClick={() => setStatusPage((p) => p + 1)}
+              onClick={() => setStatusPage(p => p + 1)}
             >
               Show More
             </button>
